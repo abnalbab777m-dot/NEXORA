@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Cairo', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #fafafa;
+  }
+  
+  body {
+    @apply bg-[#0a0a0a] text-neutral-50 font-sans antialiased selection:bg-yellow-500/30 selection:text-yellow-200;
+    direction: rtl;
+  }
+}

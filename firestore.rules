@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isAdmin() { return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN'; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // Usernames Validation
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && !exists(/databases/$(database)/documents/usernames/$(username));
+    }
+
+    // User Validation
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'username', 'email', 'role', 'status', 'createdAt', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.username is string && data.username.size() <= 50 && data.username.matches('^[a-zA-Z0-9_]+$') &&
+             data.email is string && data.email.size() <= 200 &&
+             data.role in ['USER', 'ADMIN'] &&
+             data.status in ['ACTIVE', 'FROZEN', 'BANNED'] &&
+             data.createdAt is number &&
+             data.updatedAt is number;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId && 
+                    isValidUser(incoming()) && 
+                    incoming().role == 'USER' && // Cannot self-assign ADMIN
+                    incoming().status == 'ACTIVE' &&
+                    (!('vipLevel' in incoming()) || incoming().vipLevel == 0) &&
+                    incoming().createdAt == request.time.toMillis() &&
+                    incoming().updatedAt == request.time.toMillis();
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'updatedAt']) && incoming().updatedAt == request.time.toMillis()) ||
+        isAdmin()
+      );
+    }
+
+    // Wallet Validation
+    function isValidWallet(data, isCreate) {
+      return data.keys().hasAll(['userId', 'availableBalance', 'pendingBalance', 'totalEarnings', 'totalDeposits', 'totalWithdrawals', 'updatedAt']) &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.availableBalance is number &&
+             data.pendingBalance is number &&
+             data.totalEarnings is number &&
+             data.totalDeposits is number &&
+             data.totalWithdrawals is number &&
+             data.updatedAt is number;
+    }
+
+    match /wallets/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+                    isValidWallet(incoming(), true) &&
+                    incoming().availableBalance == 0 &&
+                    incoming().pendingBalance == 0 &&
+                    incoming().totalEarnings == 0 &&
+                    incoming().totalDeposits == 0 &&
+                    incoming().totalWithdrawals == 0 &&
+                    incoming().updatedAt == request.time.toMillis();
+      allow update: if isAdmin();
+    }
+
+    // Transaction Validation
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['transactionId', 'userId', 'type', 'amount', 'currency', 'status', 'createdAt']) &&
+             data.transactionId is string && data.transactionId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.type in ['DEPOSIT', 'WITHDRAWAL', 'TASK_REWARD', 'AD_REWARD', 'VIP_UPGRADE'] &&
+             data.amount is number && data.amount > 0 &&
+             data.currency == 'USD' &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'] &&
+             data.createdAt is number;
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(transactionId) &&
+                    isValidTransaction(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    (incoming().status == 'PENDING' || isAdmin()) &&
+                    incoming().createdAt == request.time.toMillis();
+      allow update: if isAdmin();
+    }
+
+    // Task Validation
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Ads Validation
+    match /ads/{adId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Task Completion
+    function isValidTaskCompletion(data) {
+      return data.keys().hasAll(['completionId', 'taskId', 'userId', 'reward', 'status', 'completedAt']) &&
+             data.completionId is string && data.completionId.size() <= 128 &&
+             data.taskId is string && data.taskId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.reward is number && data.reward >= 0 &&
+             (data.reward == get(/databases/$(database)/documents/tasks/$(data.taskId)).data.reward) &&
+             (get(/databases/$(database)/documents/users/$(data.userId)).data.vipLevel >= get(/databases/$(database)/documents/tasks/$(data.taskId)).data.requiredVipLevel) &&
+             data.status in ['PENDING', 'COMPLETED', 'REJECTED'] &&
+             data.completedAt is number;
+    }
+
+    match /taskCompletions/{completionId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(completionId) &&
+                    isValidTaskCompletion(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    (incoming().status == 'PENDING' || isAdmin()) &&
+                    incoming().completedAt == request.time.toMillis();
+      allow update: if isAdmin();
+    }
+
+    // Ad Completion
+    function isValidAdCompletion(data) {
+      return data.keys().hasAll(['completionId', 'adId', 'userId', 'reward', 'status', 'completedAt']) &&
+             data.completionId is string && data.completionId.size() <= 128 &&
+             data.adId is string && data.adId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.reward is number && data.reward >= 0 &&
+             (data.reward == get(/databases/$(database)/documents/ads/$(data.adId)).data.reward) &&
+             (get(/databases/$(database)/documents/users/$(data.userId)).data.vipLevel >= get(/databases/$(database)/documents/ads/$(data.adId)).data.requiredVipLevel) &&
+             data.status in ['PENDING', 'COMPLETED', 'REJECTED'] &&
+             data.completedAt is number;
+    }
+
+    match /adCompletions/{completionId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(completionId) &&
+                    isValidAdCompletion(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    (incoming().status == 'PENDING' || isAdmin()) &&
+                    incoming().completedAt == request.time.toMillis();
+      allow update: if isAdmin();
+    }
+
+    // VIP Plans
+    match /vipPlans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Notifications Validation
+    function isValidNotification(data) {
+      return data.keys().hasAll(['notificationId', 'userId', 'title', 'message', 'type', 'read', 'createdAt']) &&
+             data.notificationId is string &&
+             data.userId is string &&
+             data.title is string &&
+             data.message is string &&
+             data.type in ['SUCCESS', 'WARNING', 'INFO', 'ERROR'] &&
+             data.read is bool &&
+             data.createdAt is number;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isAdmin() && isValidNotification(incoming());
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read'])) ||
+        isAdmin()
+      );
+    }
+
+  }
+}

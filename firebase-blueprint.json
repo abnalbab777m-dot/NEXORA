@@ -1,0 +1,141 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile and authentication data.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "username": { "type": "string", "maxLength": 50, "pattern": "^[a-zA-Z0-9_]+$" },
+        "email": { "type": "string", "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["USER", "ADMIN"] },
+        "status": { "type": "string", "enum": ["ACTIVE", "FROZEN", "BANNED"] },
+        "vipLevel": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "username", "email", "role", "status", "createdAt", "updatedAt"]
+    },
+    "Wallet": {
+      "title": "User Wallet",
+      "description": "User balances and financial summary.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "availableBalance": { "type": "number" },
+        "pendingBalance": { "type": "number" },
+        "totalEarnings": { "type": "number" },
+        "totalDeposits": { "type": "number" },
+        "totalWithdrawals": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "availableBalance", "pendingBalance", "totalEarnings", "totalDeposits", "totalWithdrawals", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Ledger Transaction",
+      "description": "Immutable record of any balance change.",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["DEPOSIT", "WITHDRAWAL", "TASK_REWARD", "AD_REWARD", "VIP_UPGRADE"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["USD"] },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED", "COMPLETED", "CANCELLED"] },
+        "description": { "type": "string", "maxLength": 255 },
+        "createdAt": { "type": "number" },
+        "processedAt": { "type": "number" }
+      },
+      "required": ["transactionId", "userId", "type", "amount", "currency", "status", "createdAt"]
+    },
+    "Task": {
+      "title": "Task Definition",
+      "description": "Daily task definitions created by admins.",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "reward": { "type": "number" },
+        "durationSeconds": { "type": "number" },
+        "maxCompletions": { "type": "number" },
+        "requiredVipLevel": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["taskId", "title", "reward", "requiredVipLevel", "status", "createdAt"]
+    },
+    "TaskCompletion": {
+      "title": "Task Completion Record",
+      "description": "Tracks when a user completes a task.",
+      "type": "object",
+      "properties": {
+        "completionId": { "type": "string", "maxLength": 128 },
+        "taskId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "reward": { "type": "number" },
+        "status": { "type": "string", "enum": ["PENDING", "COMPLETED", "REJECTED"] },
+        "completedAt": { "type": "number" }
+      },
+      "required": ["completionId", "taskId", "userId", "reward", "status", "completedAt"]
+    },
+    "VipPlan": {
+      "title": "VIP Plan",
+      "description": "Definition for a VIP tier.",
+      "type": "object",
+      "properties": {
+        "planId": { "type": "string", "maxLength": 128 },
+        "level": { "type": "number" },
+        "name": { "type": "string", "maxLength": 50 },
+        "price": { "type": "number" },
+        "durationDays": { "type": "number" },
+        "dailyTasks": { "type": "number" },
+        "dailyAds": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      },
+      "required": ["planId", "level", "name", "price", "durationDays", "dailyTasks", "dailyAds", "status"]
+    },
+    "Setting": {
+      "title": "System Setting",
+      "description": "Global application setting.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "maxLength": 50 },
+        "value": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["key", "value"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "wallets/{userId}": {
+      "schema": "Wallet",
+      "description": "User wallets tied strictly to user ID"
+    },
+    "transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Global ledger"
+    },
+    "tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Available tasks"
+    },
+    "taskCompletions/{completionId}": {
+      "schema": "TaskCompletion",
+      "description": "Task completions log"
+    },
+    "vipPlans/{planId}": {
+      "schema": "VipPlan",
+      "description": "VIP Tiers"
+    },
+    "settings/{settingId}": {
+      "schema": "Setting",
+      "description": "App settings"
+    }
+  }
+}

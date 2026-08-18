@@ -1,0 +1,6 @@
+{
+  "name": "Nexora",
+  "description": "منصة شاملة للمهام والإعلانات والمكافآت مع لوحة تحكم وإدارة رصيد",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

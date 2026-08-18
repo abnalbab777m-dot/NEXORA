@@ -20,7 +20,7 @@ export async function runDatabaseSeed() {
   try {
     console.log('[Seed Service]: Checking database seed state...');
 
-    // 1. Seed VIP Plans (Strictly ordered: 30, 50, 100, 300, 800 only)
+    // 1. Seed VIP Plans (Strictly ordered: 30, 50, 100, 300, 800 on initial seed)
     const targetPlans = [
       {
         level: 1,
@@ -69,20 +69,24 @@ export async function runDatabaseSeed() {
       },
     ];
 
-    const existingVip = await db.select().from(vipPlans);
-    const existingPrices = existingVip.map(p => Number(p.price)).sort((a, b) => a - b);
-    const targetPrices = [30, 50, 100, 300, 800];
-    const isMatching = existingVip.length === 5 && JSON.stringify(existingPrices) === JSON.stringify(targetPrices);
-
-    if (!isMatching) {
-      console.log('[Seed Service]: Resetting VIP Plans to exact 5 tiers (30, 50, 100, 300, 800)...');
-      await db.delete(vipPlans);
-      for (const p of targetPlans) {
-        await db.insert(vipPlans).values({
-          id: uuidv4(),
-          ...p,
-        });
+    const vipPlansSeeded = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'vip_plans_seeded')))[0];
+    if (!vipPlansSeeded) {
+      const existingVip = await db.select().from(vipPlans);
+      if (existingVip.length === 0) {
+        console.log('[Seed Service]: Initializing VIP Plans (30, 50, 100, 300, 800)...');
+        for (const p of targetPlans) {
+          await db.insert(vipPlans).values({
+            id: uuidv4(),
+            ...p,
+          });
+        }
       }
+      await db.insert(systemSettings).values({
+        key: 'vip_plans_seeded',
+        value: 'true',
+        description: 'Flag indicating initial VIP plans have been seeded',
+        updatedAt: new Date()
+      });
       console.log('[Seed Service]: VIP Plans synchronized successfully.');
     }
 
@@ -190,132 +194,161 @@ export async function runDatabaseSeed() {
       }
     ];
 
-    for (const pm of defaultPaymentMethodsList) {
-      const exists = (await db.select().from(paymentMethods).where(eq(paymentMethods.id, pm.id)))[0];
-      if (!exists) {
-        await db.insert(paymentMethods).values(pm);
+    // 2.5 Seed Payment Methods (Only on initial database creation, never overwrite admin deletions or edits)
+    const paymentMethodsSeeded = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'payment_methods_seeded')))[0];
+    if (!paymentMethodsSeeded) {
+      const currentMethods = await db.select().from(paymentMethods);
+      if (currentMethods.length === 0) {
+        console.log('[Seed Service]: Seeding initial Payment Methods...');
+        for (const pm of defaultPaymentMethodsList) {
+          await db.insert(paymentMethods).values(pm);
+        }
       }
+      await db.insert(systemSettings).values({
+        key: 'payment_methods_seeded',
+        value: 'true',
+        description: 'Flag indicating initial payment methods have been seeded',
+        updatedAt: new Date()
+      });
     }
 
-    // 3. Seed Tasks
-    const existingTasks = await db.select().from(tasks);
-    if (existingTasks.length === 0) {
-      console.log('[Seed Service]: Seeding Tasks...');
-      await db.insert(tasks).values([
-        {
-          id: uuidv4(),
-          title: 'الانضمام إلى قناة التلغرام الرسمية وتفعيل التنبيهات',
-          description: 'انضم إلى القناة الرسمية لمنصة Nexora لمتابعة إشعارات السحب والإيداع والتحديثات اليومية.',
-          reward: 2.5,
-          durationSeconds: 30,
-          url: 'https://t.me/telegram',
-          category: 'TELEGRAM',
-          taskType: 'PROOF_REQUIRED',
-          proofInstructions: 'قم بالانضمام للقناة ثم أرسل اسم المستخدم الخاص بك على تيليجرام (مثل: @username) مع لقطة شاشة توضح عضويتك في القناة.',
-          requiredVipLevel: 0,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'تقييم المنصة الإيجابي على موقع Trustpilot',
-          description: 'قم بكتابة تقييم ومراجعة 5 نجوم للمنصة على منصة التقييمات العالمية لدعم الموثوقية.',
-          reward: 5.0,
-          durationSeconds: 45,
-          url: 'https://www.trustpilot.com',
-          category: 'APP_REVIEW',
-          taskType: 'PROOF_REQUIRED',
-          proofInstructions: 'قم بوضع التقييم ثم التقط صورة للشاشة تظهر تقييمك المنشور مع كتابة اسم الحساب المستخدم في التقييم.',
-          requiredVipLevel: 1,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'متابعة الحساب الرسمي على منصة X (تويتر) وإعادة التغريد',
-          description: 'قم بمتابعة الحساب وإعادة تغريد أحدث منشور مثبت للمنصة.',
-          reward: 7.5,
-          durationSeconds: 40,
-          url: 'https://twitter.com',
-          category: 'SOCIAL',
-          taskType: 'PROOF_REQUIRED',
-          proofInstructions: 'أدخل رابط أو اسم حسابك على منصة X ولقطة شاشة تثبت المتابعة وإعادة التغريد.',
-          requiredVipLevel: 1,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'التسجيل في منصة الشريك التجاري وتفعيل الحساب',
-          description: 'قم بالتسجيل في منصة التداول الشريكة وتأكيد البريد الإلكتروني.',
-          reward: 15.0,
-          durationSeconds: 60,
-          url: 'https://accounts.binance.com',
-          category: 'REGISTRATION',
-          taskType: 'PROOF_REQUIRED',
-          proofInstructions: 'أدخل البريد الإلكتروني أو معرف الحساب (User ID) المستخدم في التسجيل مع لقطة شاشة للوحة التحكم.',
-          requiredVipLevel: 2,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'الاشتراك في قناة يوتيوب وتفعيل جرس الإشعارات',
-          description: 'اشترك في القناة التعليمية الرسمية وشاهد الفيديو التعريفي الأخير.',
-          reward: 25.0,
-          durationSeconds: 60,
-          url: 'https://www.youtube.com',
-          category: 'SOCIAL',
-          taskType: 'PROOF_REQUIRED',
-          proofInstructions: 'أرسل لقطة شاشة تظهر زر الاشتراك مفعلاً مع اسم حسابك على يوتيوب.',
-          requiredVipLevel: 3,
-          status: 'ACTIVE',
-        },
-      ]);
+    // 3. Seed Tasks (Only on initial seed)
+    const tasksSeeded = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'tasks_seeded')))[0];
+    if (!tasksSeeded) {
+      const existingTasks = await db.select().from(tasks);
+      if (existingTasks.length === 0) {
+        console.log('[Seed Service]: Seeding Tasks...');
+        await db.insert(tasks).values([
+          {
+            id: uuidv4(),
+            title: 'الانضمام إلى قناة التلغرام الرسمية وتفعيل التنبيهات',
+            description: 'انضم إلى القناة الرسمية لمنصة Nexora لمتابعة إشعارات السحب والإيداع والتحديثات اليومية.',
+            reward: 2.5,
+            durationSeconds: 30,
+            url: 'https://t.me/telegram',
+            category: 'TELEGRAM',
+            taskType: 'PROOF_REQUIRED',
+            proofInstructions: 'قم بالانضمام للقناة ثم أرسل اسم المستخدم الخاص بك على تيليجرام (مثل: @username) مع لقطة شاشة توضح عضويتك في القناة.',
+            requiredVipLevel: 0,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'تقييم المنصة الإيجابي على موقع Trustpilot',
+            description: 'قم بكتابة تقييم ومراجعة 5 نجوم للمنصة على منصة التقييمات العالمية لدعم الموثوقية.',
+            reward: 5.0,
+            durationSeconds: 45,
+            url: 'https://www.trustpilot.com',
+            category: 'APP_REVIEW',
+            taskType: 'PROOF_REQUIRED',
+            proofInstructions: 'قم بوضع التقييم ثم التقط صورة للشاشة تظهر تقييمك المنشور مع كتابة اسم الحساب المستخدم في التقييم.',
+            requiredVipLevel: 1,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'متابعة الحساب الرسمي على منصة X (تويتر) وإعادة التغريد',
+            description: 'قم بمتابعة الحساب وإعادة تغريد أحدث منشور مثبت للمنصة.',
+            reward: 7.5,
+            durationSeconds: 40,
+            url: 'https://twitter.com',
+            category: 'SOCIAL',
+            taskType: 'PROOF_REQUIRED',
+            proofInstructions: 'أدخل رابط أو اسم حسابك على منصة X ولقطة شاشة تثبت المتابعة وإعادة التغريد.',
+            requiredVipLevel: 1,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'التسجيل في منصة الشريك التجاري وتفعيل الحساب',
+            description: 'قم بالتسجيل في منصة التداول الشريكة وتأكيد البريد الإلكتروني.',
+            reward: 15.0,
+            durationSeconds: 60,
+            url: 'https://accounts.binance.com',
+            category: 'REGISTRATION',
+            taskType: 'PROOF_REQUIRED',
+            proofInstructions: 'أدخل البريد الإلكتروني أو معرف الحساب (User ID) المستخدم في التسجيل مع لقطة شاشة للوحة التحكم.',
+            requiredVipLevel: 2,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'الاشتراك في قناة يوتيوب وتفعيل جرس الإشعارات',
+            description: 'اشترك في القناة التعليمية الرسمية وشاهد الفيديو التعريفي الأخير.',
+            reward: 25.0,
+            durationSeconds: 60,
+            url: 'https://www.youtube.com',
+            category: 'SOCIAL',
+            taskType: 'PROOF_REQUIRED',
+            proofInstructions: 'أرسل لقطة شاشة تظهر زر الاشتراك مفعلاً مع اسم حسابك على يوتيوب.',
+            requiredVipLevel: 3,
+            status: 'ACTIVE',
+          },
+        ]);
+      }
+      await db.insert(systemSettings).values({
+        key: 'tasks_seeded',
+        value: 'true',
+        description: 'Flag indicating initial tasks have been seeded',
+        updatedAt: new Date()
+      });
     }
 
-    // 4. Seed Ads
-    const existingAds = await db.select().from(ads);
-    if (existingAds.length === 0) {
-      console.log('[Seed Service]: Seeding Ads...');
-      await db.insert(ads).values([
-        {
-          id: uuidv4(),
-          title: 'فيديو ترويجي: مقدمة حول التداول الآلي والذكاء المالي',
-          description: 'شاهد فيديو الإعلان الترويجي عبر YouTube لمدة 15 ثانية للحصول على المكافأة فوراً.',
-          reward: 1.5,
-          durationSeconds: 15,
-          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-          requiredVipLevel: 0,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'زيارة موقع الشريك الاستثماري العالمي (PTC Ad)',
-          description: 'تصفح موقع الشريك المعتمد لمدة 15 ثانية واستلم مكافأة التصفح المباشرة.',
-          reward: 3.5,
-          durationSeconds: 15,
-          url: 'https://www.google.com',
-          requiredVipLevel: 1,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'فيديو توضيحي: استراتيجيات الأرباح اليومية وسحب الأرباح',
-          description: 'شاهد الشرح التوضيحي السريع لكيفية تعظيم العوائد وسحب الأرباح.',
-          reward: 8.0,
-          durationSeconds: 20,
-          url: 'https://www.youtube.com/watch?v=L_LUpnjgPso',
-          requiredVipLevel: 2,
-          status: 'ACTIVE',
-        },
-        {
-          id: uuidv4(),
-          title: 'زيارة منصة التداول اللامركزي Web3 للشركاء',
-          description: 'تصفح بروتوكول التداول اللامركزي الخاص بالمستثمرين واستلم المكافأة.',
-          reward: 20.0,
-          durationSeconds: 25,
-          url: 'https://coinmarketcap.com',
-          requiredVipLevel: 3,
-          status: 'ACTIVE',
-        },
-      ]);
+    // 4. Seed Ads (Only on initial seed)
+    const adsSeeded = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'ads_seeded')))[0];
+    if (!adsSeeded) {
+      const existingAds = await db.select().from(ads);
+      if (existingAds.length === 0) {
+        console.log('[Seed Service]: Seeding Ads...');
+        await db.insert(ads).values([
+          {
+            id: uuidv4(),
+            title: 'فيديو ترويجي: مقدمة حول التداول الآلي والذكاء المالي',
+            description: 'شاهد فيديو الإعلان الترويجي عبر YouTube لمدة 15 ثانية للحصول على المكافأة فوراً.',
+            reward: 1.5,
+            durationSeconds: 15,
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            requiredVipLevel: 0,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'زيارة موقع الشريك الاستثماري العالمي (PTC Ad)',
+            description: 'تصفح موقع الشريك المعتمد لمدة 15 ثانية واستلم مكافأة التصفح المباشرة.',
+            reward: 3.5,
+            durationSeconds: 15,
+            url: 'https://www.google.com',
+            requiredVipLevel: 1,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'فيديو توضيحي: استراتيجيات الأرباح اليومية وسحب الأرباح',
+            description: 'شاهد الشرح التوضيحي السريع لكيفية تعظيم العوائد وسحب الأرباح.',
+            reward: 8.0,
+            durationSeconds: 20,
+            url: 'https://www.youtube.com/watch?v=L_LUpnjgPso',
+            requiredVipLevel: 2,
+            status: 'ACTIVE',
+          },
+          {
+            id: uuidv4(),
+            title: 'زيارة منصة التداول اللامركزي Web3 للشركاء',
+            description: 'تصفح بروتوكول التداول اللامركزي الخاص بالمستثمرين واستلم المكافأة.',
+            reward: 20.0,
+            durationSeconds: 25,
+            url: 'https://coinmarketcap.com',
+            requiredVipLevel: 3,
+            status: 'ACTIVE',
+          },
+        ]);
+      }
+      await db.insert(systemSettings).values({
+        key: 'ads_seeded',
+        value: 'true',
+        description: 'Flag indicating initial ads have been seeded',
+        updatedAt: new Date()
+      });
     }
 
     // 5. Seed Admin User (admin@nexora.com / Admin@123456)
@@ -588,14 +621,6 @@ export async function runDatabaseSeed() {
           totalWithdrawals: 4200.0,
           totalDeposits: 1500.0,
         });
-      } else {
-        await db.update(wallets).set({
-          availableBalance: 1450.0,
-          pendingBalance: 200.0,
-          totalEarnings: 5850.0,
-          totalWithdrawals: 4200.0,
-          totalDeposits: 1500.0,
-        }).where(eq(wallets.userId, existingAdmin.id));
       }
     }
 

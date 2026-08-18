@@ -23,6 +23,7 @@ import {
 import { formatCurrency, cn } from '../../lib/utils';
 import { api } from '../../lib/api';
 import { Link } from 'react-router-dom';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 export default function AdminDashboard() {
   const toast = useToast();
@@ -35,7 +36,8 @@ export default function AdminDashboard() {
     totalEarnings: 0,
     pendingDepositsCount: 0,
     pendingWithdrawalsCount: 0,
-    pendingTransactionsCount: 0
+    pendingTransactionsCount: 0,
+    tasks: { completed: 0, pending: 0, rejected: 0 }
   });
 
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
@@ -170,6 +172,69 @@ export default function AdminDashboard() {
               {formatCurrency(stats.totalWithdrawals || 0)}
             </div>
             <p className="text-xs text-neutral-500 mt-1 font-mono">تم تحويلها للعملاء</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Task Statistics Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-neutral-800 bg-neutral-900/40">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-neutral-300">إحصائيات المهام</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center">
+            {stats.tasks?.completed === 0 && stats.tasks?.pending === 0 && stats.tasks?.rejected === 0 ? (
+              <div className="h-64 flex items-center justify-center text-neutral-500">
+                لا توجد مهام مسجلة حتى الآن
+              </div>
+            ) : (
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'مكتملة', value: stats.tasks?.completed || 0 },
+                        { name: 'قيد التنفيذ', value: stats.tasks?.pending || 0 },
+                        { name: 'مرفوضة', value: stats.tasks?.rejected || 0 },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#10b981" /> {/* Emerald for Completed */}
+                      <Cell fill="#f59e0b" /> {/* Amber for Pending */}
+                      <Cell fill="#ef4444" /> {/* Red for Rejected */}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#171717', borderColor: '#262626', color: '#fff', borderRadius: '8px' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value) => <span className="text-neutral-300 text-sm ml-2">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            <div className="flex gap-4 mt-4 w-full justify-center">
+              <div className="text-center">
+                <p className="text-xs text-neutral-500">مكتملة</p>
+                <p className="text-lg font-bold text-emerald-400">{stats.tasks?.completed || 0}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-neutral-500">قيد التنفيذ</p>
+                <p className="text-lg font-bold text-amber-400">{stats.tasks?.pending || 0}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-neutral-500">مرفوضة</p>
+                <p className="text-lg font-bold text-red-400">{stats.tasks?.rejected || 0}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

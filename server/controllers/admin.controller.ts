@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../../src/db/index.ts';
-import { users, deposits, withdrawals, adminLogs, wallets, transactions, notifications } from '../../src/db/schema.ts';
+import { users, deposits, withdrawals, adminLogs, wallets, transactions, notifications, taskCompletions } from '../../src/db/schema.ts';
 import { eq, desc, sql } from 'drizzle-orm';
 import { WalletService } from '../services/wallet.service';
 import { SettingsService } from '../services/settings.service';
@@ -24,6 +24,7 @@ export const adminController = {
       const allWallets = await db.select().from(wallets);
       const allDeposits = await db.select().from(deposits);
       const allWithdrawals = await db.select().from(withdrawals);
+      const allTaskCompletions = await db.select().from(taskCompletions);
 
       const totalUsers = allUsers.length;
       const activeUsers = allUsers.filter(u => u.status === 'ACTIVE').length;
@@ -40,6 +41,10 @@ export const adminController = {
       const totalEarningsDistributed = allWallets.reduce((acc, w) => acc + (Number(w.totalEarnings) || 0), 0);
       const totalAvailableBalance = allWallets.reduce((acc, w) => acc + (Number(w.availableBalance) || 0), 0);
 
+      const completedTasksCount = allTaskCompletions.filter(t => t.status === 'COMPLETED').length;
+      const pendingTasksCount = allTaskCompletions.filter(t => t.status === 'PENDING').length;
+      const rejectedTasksCount = allTaskCompletions.filter(t => t.status === 'REJECTED').length;
+
       return res.json({
         stats: {
           totalUsers,
@@ -52,6 +57,11 @@ export const adminController = {
           pendingDepositsCount: pendingDeposits.length,
           pendingWithdrawalsCount: pendingWithdrawals.length,
           pendingTransactions: pendingDeposits.length + pendingWithdrawals.length,
+          tasks: {
+            completed: completedTasksCount,
+            pending: pendingTasksCount,
+            rejected: rejectedTasksCount
+          }
         }
       });
     } catch (error) {

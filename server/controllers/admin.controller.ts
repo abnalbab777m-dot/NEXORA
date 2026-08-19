@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../../src/db/index.ts';
 import { users, deposits, withdrawals, adminLogs, wallets, transactions, notifications, taskCompletions } from '../../src/db/schema.ts';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 import { WalletService } from '../services/wallet.service';
 import { SettingsService } from '../services/settings.service';
 import { TelegramService } from '../services/telegram.service';
@@ -239,6 +239,18 @@ export const adminController = {
         depositUser = deposit.userId;
         depositAmount = Number(deposit.amount) || 0;
 
+        // Backward compatibility for transactions created with different IDs by old code:
+        const txRecord = (await tx.select().from(transactions).where(
+          and(
+            eq(transactions.userId, deposit.userId),
+            eq(transactions.type, 'DEPOSIT'),
+            eq(transactions.amount, depositAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        ).orderBy(desc(transactions.createdAt)).limit(1))[0];
+        
+        const existingTxId = txRecord ? txRecord.id : id;
+
         // Process wallet transaction securely
         await WalletService.processTransactionWithTx(
           tx,
@@ -248,7 +260,7 @@ export const adminController = {
           'APPROVED', 
           `إيداع مؤكد (TXID: ${deposit.reference || id})`, 
           req.user.id,
-          id // existingTxId matches the depositId
+          existingTxId
         );
 
         // Update deposit status
@@ -299,17 +311,31 @@ export const adminController = {
         const deposit = (await tx.select().from(deposits).where(eq(deposits.id, id)))[0];
         if (!deposit) throw new Error('طلب الإيداع غير موجود');
         if (deposit.status !== 'PENDING') throw new Error('العملية تمت معالجتها مسبقاً');
+        
+        const depositAmount = Number(deposit.amount) || 0;
+        
+        // Backward compatibility for transactions created with different IDs by old code:
+        const txRecord = (await tx.select().from(transactions).where(
+          and(
+            eq(transactions.userId, deposit.userId),
+            eq(transactions.type, 'DEPOSIT'),
+            eq(transactions.amount, depositAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        ).orderBy(desc(transactions.createdAt)).limit(1))[0];
+        
+        const existingTxId = txRecord ? txRecord.id : id;
 
         // Process wallet transaction securely (updates ledger to REJECTED)
         await WalletService.processTransactionWithTx(
           tx,
           deposit.userId, 
-          Number(deposit.amount), 
+          depositAmount, 
           'DEPOSIT', 
           'REJECTED', 
           `طلب إيداع مرفوض (TXID: ${deposit.reference || id})`, 
           req.user.id,
-          id // existingTxId
+          existingTxId
         );
 
         // Update status to REJECTED
@@ -363,6 +389,18 @@ export const adminController = {
 
         withdrawalAmount = Number(withdrawal.amount) || 0;
 
+        // Backward compatibility for transactions created with different IDs by old code:
+        const txRecord = (await tx.select().from(transactions).where(
+          and(
+            eq(transactions.userId, withdrawal.userId),
+            eq(transactions.type, 'WITHDRAWAL'),
+            eq(transactions.amount, withdrawalAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        ).orderBy(desc(transactions.createdAt)).limit(1))[0];
+        
+        const existingTxId = txRecord ? txRecord.id : id;
+
         // Process wallet securely (moves from pending to totalWithdrawals)
         await WalletService.processTransactionWithTx(
           tx,
@@ -372,7 +410,7 @@ export const adminController = {
           'APPROVED', 
           txHash ? `سحب مؤكد (Hash: ${txHash})` : `سحب مؤكد إلى محفظة: ${withdrawal.reference || ''}`, 
           req.user.id,
-          id // existingTxId
+          existingTxId
         );
 
         // Update withdrawal status
@@ -427,6 +465,18 @@ export const adminController = {
 
         withdrawalAmount = Number(withdrawal.amount) || 0;
 
+        // Backward compatibility for transactions created with different IDs by old code:
+        const txRecord = (await tx.select().from(transactions).where(
+          and(
+            eq(transactions.userId, withdrawal.userId),
+            eq(transactions.type, 'WITHDRAWAL'),
+            eq(transactions.amount, withdrawalAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        ).orderBy(desc(transactions.createdAt)).limit(1))[0];
+        
+        const existingTxId = txRecord ? txRecord.id : id;
+
         // Process refund in wallet (REJECTED status automatically adds amount back to available and deducts from pending!)
         await WalletService.processTransactionWithTx(
           tx,
@@ -436,7 +486,7 @@ export const adminController = {
           'REJECTED', 
           `استرجاع سحب مرفوض (${rejectReason})`, 
           req.user.id,
-          id // existingTxId
+          existingTxId
         );
 
         // Update status to REJECTED

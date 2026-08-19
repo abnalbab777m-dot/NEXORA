@@ -263,7 +263,7 @@ export default function WalletPage() {
         </span>
       );
     }
-    if (st === 'REJECTED' || st === 'CANCELLED') {
+    if (st === 'REJECTED' || st === 'CANCELLED' || st === 'FAILED') {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
           <XCircle className="w-3.5 h-3.5" /> مرفوض
@@ -275,6 +275,30 @@ export default function WalletPage() {
         {status}
       </span>
     );
+  };
+
+  const getDynamicDescription = (tx: any) => {
+    const st = (tx.status || '').toUpperCase();
+    let baseText = tx.description || `عملية ${tx.type}`;
+    
+    if (tx.type === 'DEPOSIT') {
+      if (st === 'COMPLETED' || st === 'APPROVED') baseText = "إيداع مؤكد";
+      else if (st === 'REJECTED' || st === 'FAILED' || st === 'CANCELLED') baseText = "طلب إيداع مرفوض";
+      else if (st === 'PENDING') baseText = "طلب إيداع قيد المراجعة";
+    } else if (tx.type === 'WITHDRAWAL') {
+      if (st === 'COMPLETED' || st === 'APPROVED') baseText = "سحب مؤكد";
+      else if (st === 'REJECTED' || st === 'FAILED' || st === 'CANCELLED') baseText = "طلب سحب مرفوض";
+      else if (st === 'PENDING') baseText = "طلب سحب قيد المراجعة";
+    }
+    
+    // Extract TXID or Hash if it exists in the original description to keep context
+    if (tx.description) {
+      const match = tx.description.match(/\(TXID:[^)]+\)/i) || tx.description.match(/\(Hash:[^)]+\)/i) || tx.description.match(/إلى محفظة:[^)]+/i);
+      if (match) {
+        return `${baseText} ${match[0]}`;
+      }
+    }
+    return baseText;
   };
 
   const getTransactionTypeDetails = (type: string) => {
@@ -576,7 +600,7 @@ export default function WalletPage() {
                               <span className="sm:hidden">{getStatusBadge(tx.status)}</span>
                             </div>
                             <p className="text-xs text-neutral-400 mt-0.5 max-w-md line-clamp-1">
-                              {tx.description || `عملية ${tx.type}`}
+                              {getDynamicDescription(tx)}
                             </p>
                             <span className="text-[11px] text-neutral-500 font-mono block mt-1">
                               {tx.createdAt ? new Date(tx.createdAt).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : ''}

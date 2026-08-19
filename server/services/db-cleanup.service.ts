@@ -1,10 +1,30 @@
 import { db } from '../../src/db/index.ts';
-import { deposits, withdrawals, transactions } from '../../src/db/schema.ts';
+import { deposits, withdrawals, transactions, systemSettings, paymentMethods } from '../../src/db/schema.ts';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
 export async function runDatabaseCleanup() {
   try {
     console.log('[DB Cleanup] Starting automatic transaction synchronization & cleanup...');
+
+    // 0. Ensure min_withdrawal in system_settings is updated to 5.00
+    try {
+      const minWithSetting = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'min_withdrawal')))[0];
+      if (minWithSetting && (minWithSetting.value === '10' || minWithSetting.value === '10.00' || minWithSetting.value === '10.0')) {
+        await db.update(systemSettings).set({ value: '5.00', updatedAt: new Date() }).where(eq(systemSettings.key, 'min_withdrawal'));
+        console.log('[DB Cleanup] Updated system min_withdrawal to 5.00$');
+      }
+    } catch (e) {}
+
+    // 0.1 Ensure payment methods with minLimit 10 are adjusted to 5
+    try {
+      const allPms = await db.select().from(paymentMethods);
+      for (const pm of allPms) {
+        if (Number(pm.minLimit) === 10) {
+          await db.update(paymentMethods).set({ minLimit: 5, updatedAt: new Date() }).where(eq(paymentMethods.id, pm.id));
+          console.log(`[DB Cleanup] Updated payment method ${pm.name} minLimit to 5$`);
+        }
+      }
+    } catch (e) {}
 
     // 1. Fetch all deposits, withdrawals, and transactions
     const allDeposits = await db.select().from(deposits);

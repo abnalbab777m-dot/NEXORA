@@ -66,12 +66,28 @@ export default function WalletPage() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawPin, setWithdrawPin] = useState('');
   const [isWithdrawSubmitting, setIsWithdrawSubmitting] = useState(false);
+  const [minWithdrawalLimit, setMinWithdrawalLimit] = useState<number>(5);
 
   useEffect(() => {
     fetchTransactions();
     fetchPaymentMethods();
+    fetchSystemSettings();
     refreshWallet();
   }, []);
+
+  const fetchSystemSettings = async () => {
+    try {
+      const res = await api.getSettings();
+      if (res?.settings?.min_withdrawal) {
+        const val = parseFloat(res.settings.min_withdrawal);
+        if (!isNaN(val) && val > 0) {
+          setMinWithdrawalLimit(val);
+        }
+      }
+    } catch (e) {
+      // default is 5
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'overview') {
@@ -429,6 +445,36 @@ export default function WalletPage() {
         </div>
       </div>
 
+      {/* Dynamic Minimum Withdrawal Limit & Policy Alert */}
+      <div className="bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-emerald-500/10 border border-yellow-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center text-yellow-400 shrink-0">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white text-sm">سياسة السحب المعتمدة</span>
+              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-xs font-bold font-mono">
+                الحد الأدنى للسحب: {formatCurrency(minWithdrawalLimit)} فقط
+              </span>
+              <span className="bg-neutral-800 text-neutral-300 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                متاح 24/7
+              </span>
+            </div>
+            <p className="text-neutral-400 text-xs mt-1">
+              تم اعتماد الحد الأدنى للسحب بقيمة <strong className="text-yellow-400 font-mono">{formatCurrency(minWithdrawalLimit)}</strong> لجميع المستخدمين عبر كافة بوابات الدفع الرقمية.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setActiveTab('withdraw')}
+          className="shrink-0 px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-neutral-950 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-md"
+        >
+          <ArrowUpFromLine className="w-3.5 h-3.5" />
+          سحب الأرباح الآن
+        </button>
+      </div>
+
       {/* Synchronized Financial Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Available Balance */}
@@ -444,7 +490,10 @@ export default function WalletPage() {
             <div className="text-3xl font-extrabold text-yellow-400 mb-1">
               {formatCurrency(wallet?.availableBalance || 0)}
             </div>
-            <p className="text-[11px] text-neutral-500">جاهز للسحب الفوري إلى محفظتك</p>
+            <div className="flex items-center justify-between text-[11px] mt-2 pt-2 border-t border-neutral-800">
+              <span className="text-neutral-500">جاهز للسحب الفوري</span>
+              <span className="text-emerald-400 font-mono font-medium">الحد الأدنى: {formatCurrency(minWithdrawalLimit)}</span>
+            </div>
           </CardContent>
         </Card>
 
@@ -915,7 +964,27 @@ export default function WalletPage() {
 
         {/* ================= TAB 3: WITHDRAWAL REQUEST ================= */}
         {activeTab === 'withdraw' && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {/* Prominent Min Withdrawal Alert Banner */}
+            <div className="bg-gradient-to-r from-emerald-500/10 via-yellow-500/10 to-amber-500/10 border border-emerald-500/30 p-4 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">الحد الأدنى للسحب الرسمي</span>
+                    <span className="bg-emerald-500 text-neutral-950 px-2 py-0.5 rounded-full text-xs font-black font-mono">
+                      {formatCurrency(minWithdrawalLimit)} فقط
+                    </span>
+                  </div>
+                  <p className="text-neutral-400 text-xs mt-0.5">
+                    يمكنك سحب أرباحك فور وصول رصيدك إلى {formatCurrency(minWithdrawalLimit)} بدون أي رسوم إضافية مخفية، ومتاح طوال أيام الأسبوع.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <Card className="border-neutral-800">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -923,8 +992,13 @@ export default function WalletPage() {
                     <ArrowUpFromLine className="w-5 h-5 text-yellow-500" />
                     <CardTitle className="text-lg text-white">طلب سحب الأرباح إلى محفظتك</CardTitle>
                   </div>
-                  <div className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full text-xs font-bold">
-                    الرصيد المتاح: {formatCurrency(wallet?.availableBalance || 0)}
+                  <div className="flex items-center gap-2">
+                    <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-xs font-bold font-mono">
+                      الحد الأدنى: {formatCurrency(minWithdrawalLimit)}
+                    </div>
+                    <div className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full text-xs font-bold">
+                      الرصيد المتاح: {formatCurrency(wallet?.availableBalance || 0)}
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -962,6 +1036,7 @@ export default function WalletPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {withdrawMethods.map((m) => {
                         const isSelected = selectedWithdrawMethod?.id === m.id;
+                        const effectiveMin = Number(m.minLimit) > 0 ? Number(m.minLimit) : minWithdrawalLimit;
                         return (
                           <button
                             key={m.id}
@@ -980,7 +1055,7 @@ export default function WalletPage() {
                             </div>
                             <div className="flex items-center justify-between text-[10px] text-neutral-400">
                               <span>{m.network || 'سحب رقمي'}</span>
-                              <span className="font-mono text-yellow-400">الحد الأدنى: ${m.minLimit}</span>
+                              <span className="font-mono text-emerald-400 font-semibold">الحد الأدنى: ${effectiveMin.toFixed(2)}</span>
                             </div>
                           </button>
                         );
@@ -1012,17 +1087,22 @@ export default function WalletPage() {
 
                     {/* Withdrawal Amount */}
                     <div>
-                      <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                        المبلغ المراد سحبه بالدولار ($)
-                      </label>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="block text-xs font-semibold text-neutral-300">
+                          المبلغ المراد سحبه بالدولار ($)
+                        </label>
+                        <span className="text-xs font-bold text-emerald-400 font-mono">
+                          الحد الأدنى: {formatCurrency(Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit)}
+                        </span>
+                      </div>
                       <div className="relative">
                         <Input 
                           id="input-withdraw-amount"
                           type="number"
-                          min={selectedWithdrawMethod.minLimit}
+                          min={Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit}
                           max={Math.min(selectedWithdrawMethod.maxLimit, Number(wallet?.availableBalance || 0))}
                           step="0.01"
-                          placeholder={`الحد الأدنى: ${selectedWithdrawMethod.minLimit.toFixed(2)} $`}
+                          placeholder={`الحد الأدنى: ${(Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit).toFixed(2)} $`}
                           value={withdrawAmount}
                           onChange={e => setWithdrawAmount(e.target.value)}
                           required
@@ -1030,7 +1110,7 @@ export default function WalletPage() {
                         />
                       </div>
                       <div className="flex justify-between items-center text-[11px] text-neutral-500 mt-1 px-1">
-                        <span>الحد الأدنى للسحب: {formatCurrency(selectedWithdrawMethod.minLimit)}</span>
+                        <span className="text-emerald-400 font-medium">الحد الأدنى للسحب: {formatCurrency(Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit)}</span>
                         <span>
                           رسوم التحويل: {selectedWithdrawMethod.networkFee > 0 ? formatCurrency(selectedWithdrawMethod.networkFee) : '0.00 $ (مجاناً)'}
                         </span>
@@ -1076,11 +1156,11 @@ export default function WalletPage() {
                       variant="primary"
                       className="w-full bg-yellow-500 hover:bg-yellow-400 text-neutral-950 font-bold py-3 text-base shadow-lg shadow-yellow-500/10 transition-transform active:scale-[0.99]" 
                       isLoading={isWithdrawSubmitting}
-                      disabled={Number(wallet?.availableBalance || 0) < selectedWithdrawMethod.minLimit}
+                      disabled={Number(wallet?.availableBalance || 0) < (Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit)}
                     >
                       <ArrowUpFromLine className="w-4 h-4 ml-2" />
-                      {Number(wallet?.availableBalance || 0) < selectedWithdrawMethod.minLimit 
-                        ? `الرصيد المتاح أقل من الحد الأدنى (${selectedWithdrawMethod.minLimit}$)` 
+                      {Number(wallet?.availableBalance || 0) < (Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit)
+                        ? `الرصيد المتاح أقل من الحد الأدنى (${(Number(selectedWithdrawMethod.minLimit) > 0 ? Number(selectedWithdrawMethod.minLimit) : minWithdrawalLimit)}$)` 
                         : 'تأكيد طلب السحب'}
                     </Button>
                   </form>

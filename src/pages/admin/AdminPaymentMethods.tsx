@@ -86,7 +86,7 @@ export default function AdminPaymentMethods() {
       walletAddressOrAccount: '',
       network: '',
       qrCodeUrl: '',
-      minLimit: 10,
+      minLimit: 5,
       maxLimit: 50000,
       networkFee: 0,
       instructions: '',

@@ -97,7 +97,7 @@ export class SettingsService {
         map[row.key] = row.value;
       }
 
-      // Insert missing defaults
+      // Insert missing defaults or migrate legacy min_withdrawal = 10
       for (const [key, item] of Object.entries(DEFAULT_SETTINGS)) {
         if (!map[key]) {
           try {
@@ -110,6 +110,15 @@ export class SettingsService {
             map[key] = item.value;
           } catch (err) {
             map[key] = item.value;
+          }
+        } else if (key === 'min_withdrawal' && (map[key] === '10' || map[key] === '10.00' || map[key] === '10.0')) {
+          try {
+            await db.update(systemSettings)
+              .set({ value: '5.00', updatedAt: new Date() })
+              .where(eq(systemSettings.key, 'min_withdrawal'));
+            map[key] = '5.00';
+          } catch (err) {
+            map[key] = '5.00';
           }
         }
       }

@@ -25,27 +25,83 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { Link } from 'react-router-dom';
 
-// Expected profit calculation helper based on plan level & stats
+// Expected profit calculation helper based on official Nexora VIP system (160% net profit, 30 days duration)
 const getPlanProfitEstimates = (plan: VipPlan) => {
   switch (plan.level) {
-    case 1: // $30
-      return { dailyProfit: 4.0, monthlyProfit: 120.0, taskRate: 0.60, adRate: 0.20, badge: 'الأكثر شيوعاً للمبتدئين' };
-    case 2: // $50
-      return { dailyProfit: 7.5, monthlyProfit: 225.0, taskRate: 0.75, adRate: 0.22, badge: 'قيمة ممتازة' };
+    case 1: // $15
+      return { 
+        dailyProfit: 1.30, 
+        monthlyProfit: 39.0, 
+        netProfit: 24.0, 
+        tasksCount: 4, 
+        adsCount: 4, 
+        unitReward: 0.1625, 
+        badge: 'VIP 1 (المبتدئ)' 
+      };
+    case 2: // $30
+      return { 
+        dailyProfit: 2.60, 
+        monthlyProfit: 78.0, 
+        netProfit: 48.0, 
+        tasksCount: 6, 
+        adsCount: 6, 
+        unitReward: 0.2167, 
+        badge: 'VIP 2 (المتقدم)' 
+      };
     case 3: // $100
-      return { dailyProfit: 16.0, monthlyProfit: 480.0, taskRate: 1.10, adRate: 0.28, badge: 'الأكثر طلباً' };
-    case 4: // $300
-      return { dailyProfit: 55.0, monthlyProfit: 1650.0, taskRate: 2.20, adRate: 0.55, badge: 'أرباح متقدمة' };
-    case 5: // $800
-      return { dailyProfit: 160.0, monthlyProfit: 4800.0, taskRate: 3.80, adRate: 0.90, badge: 'الباقة البلاتينية' };
+      return { 
+        dailyProfit: 8.67, 
+        monthlyProfit: 260.0, 
+        netProfit: 160.0, 
+        tasksCount: 8, 
+        adsCount: 8, 
+        unitReward: 0.5419, 
+        badge: 'VIP 3 (الفضي)' 
+      };
+    case 4: // $250
+      return { 
+        dailyProfit: 21.67, 
+        monthlyProfit: 650.0, 
+        netProfit: 400.0, 
+        tasksCount: 12, 
+        adsCount: 12, 
+        unitReward: 0.9029, 
+        badge: 'VIP 4 (الذهبي)' 
+      };
+    case 5: // $500
+      return { 
+        dailyProfit: 43.33, 
+        monthlyProfit: 1300.0, 
+        netProfit: 800.0, 
+        tasksCount: 16, 
+        adsCount: 16, 
+        unitReward: 1.3541, 
+        badge: 'VIP 5 (البلاتيني)' 
+      };
+    case 6: // $1000
+      return { 
+        dailyProfit: 86.67, 
+        monthlyProfit: 2600.0, 
+        netProfit: 1600.0, 
+        tasksCount: 20, 
+        adsCount: 20, 
+        unitReward: 2.1668, 
+        badge: 'VIP 6 (الماسي)' 
+      };
     default: {
-      const daily = Number((plan.dailyTasks * 0.75 + plan.dailyAds * 0.25).toFixed(2));
+      const price = Number(plan.price) || 15;
+      const daily = Number(((price * 2.6) / 30).toFixed(2));
+      const monthly = Number((daily * (plan.durationDays || 30)).toFixed(2));
+      const net = Number((monthly - price).toFixed(2));
+      const totalInteractions = (plan.dailyTasks || 4) + (plan.dailyAds || 4);
       return {
         dailyProfit: daily,
-        monthlyProfit: Number((daily * plan.durationDays).toFixed(2)),
-        taskRate: 0.75,
-        adRate: 0.25,
-        badge: `VIP ${plan.level}`
+        monthlyProfit: monthly,
+        netProfit: net,
+        tasksCount: plan.dailyTasks || 4,
+        adsCount: plan.dailyAds || 4,
+        unitReward: Number((daily / totalInteractions).toFixed(4)),
+        badge: plan.name || `VIP ${plan.level}`
       };
     }
   }
@@ -150,7 +206,7 @@ export default function VIPPage() {
           </h1>
           
           <p className="text-neutral-400 text-sm md:text-base leading-relaxed">
-            اشترك في إحدى باقات VIP لتتمتع بمهام يومية أكبر، عوائد إعلانية أعلى، وسحب أرباح فوري بدون تأخير، يتم خصم قيمة الباقة مباشرة من رصيدك المتاح.
+            اشترك في إحدى باقات VIP المعتمدة (نسبة صافي الربح 160% | صلاحية 30 يوماً). تُضاف أرباح المهام والإعلانات مباشرة إلى رصيدك المتاح، والسحب متاح على مدار الساعة (24/7) فور وصول الرصيد إلى 5.00$ أو أكثر.
           </p>
 
           {/* Current VIP Status & Wallet Bar */}
@@ -259,49 +315,59 @@ export default function VIPPage() {
                 {/* Stats / Expected Profit Highlights */}
                 <div className="grid grid-cols-2 gap-2.5 bg-neutral-950/60 p-3 rounded-xl border border-neutral-800/80">
                   <div className="p-2 text-center rounded-lg bg-neutral-900/50">
-                    <span className="text-[11px] text-neutral-400 block mb-0.5">الربح اليومي المتوقع</span>
+                    <span className="text-[11px] text-neutral-400 block mb-0.5">الربح اليومي</span>
                     <span className="text-sm font-bold text-emerald-400">
                       +{formatCurrency(dailyProfit)}
                     </span>
                   </div>
                   <div className="p-2 text-center rounded-lg bg-neutral-900/50">
-                    <span className="text-[11px] text-neutral-400 block mb-0.5">العائد الإجمالي (30 يوم)</span>
+                    <span className="text-[11px] text-neutral-400 block mb-0.5">إجمالي العائد (30 يوم)</span>
                     <span className="text-sm font-bold text-amber-400">
                       +{formatCurrency(monthlyProfit)}
                     </span>
                   </div>
                 </div>
 
+                {/* Net Profit Banner */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                  <span className="text-neutral-300 font-medium">صافي الربح (+160%):</span>
+                  <span className="text-emerald-400 font-bold font-mono">+{formatCurrency(getPlanProfitEstimates(plan).netProfit)}</span>
+                </div>
+
                 {/* Features & Daily Limits List */}
-                <ul className="space-y-3 text-xs text-neutral-300">
-                  <li className="flex items-center gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400">
-                      <Layers className="w-3 h-3" />
+                <ul className="space-y-2.5 text-xs text-neutral-300">
+                  <li className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400">
+                        <Layers className="w-3 h-3" />
+                      </div>
+                      <span className="font-medium text-white">{getPlanProfitEstimates(plan).tasksCount} مهام يومية</span>
                     </div>
-                    <span className="font-medium text-white">{plan.dailyTasks} مهام يومية</span>
-                    <span className="text-neutral-500 text-[11px] mr-auto">(معدل ربح أعلى)</span>
+                    <span className="text-neutral-400 font-mono text-[11px]">~{formatCurrency(getPlanProfitEstimates(plan).unitReward)} للمهمة</span>
                   </li>
 
-                  <li className="flex items-center gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400">
-                      <Tv className="w-3 h-3" />
+                  <li className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400">
+                        <Tv className="w-3 h-3" />
+                      </div>
+                      <span className="font-medium text-white">{getPlanProfitEstimates(plan).adsCount} إعلانات يومية</span>
                     </div>
-                    <span className="font-medium text-white">{plan.dailyAds} إعلانات يومية</span>
-                    <span className="text-neutral-500 text-[11px] mr-auto">(أرباح فورية)</span>
+                    <span className="text-neutral-400 font-mono text-[11px]">~{formatCurrency(getPlanProfitEstimates(plan).unitReward)} للإعلان</span>
                   </li>
 
-                  <li className="flex items-center gap-2.5">
+                  <li className="flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-400">
                       <Zap className="w-3 h-3" />
                     </div>
-                    <span>أولوية قصوى في معالجة السحوبات</span>
+                    <span className="text-neutral-300">السحب متاح 24/7 (الحد الأدنى 5.00$)</span>
                   </li>
 
-                  <li className="flex items-center gap-2.5">
+                  <li className="flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-400">
                       <ShieldCheck className="w-3 h-3" />
                     </div>
-                    <span>دعم فني VIP مخصص وسريع</span>
+                    <span className="text-neutral-300">إضافة فورية للأرباح إلى الرصيد المتاح</span>
                   </li>
                 </ul>
 

@@ -317,36 +317,17 @@ export const walletController = {
       const numAmount = Number(amount);
       const recipientAddress = address || reference || '';
 
-      // Check min withdrawal from settings
-      let minWithdrawal = 50;
+      // Check min withdrawal from settings (Default 5.00$)
+      let minWithdrawal = 5;
       try {
         const settingRow = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'min_withdrawal')))[0];
         if (settingRow?.value) {
-          minWithdrawal = parseFloat(settingRow.value) || 50;
+          minWithdrawal = parseFloat(settingRow.value) || 5;
         }
       } catch (e) {}
 
       if (isNaN(numAmount) || numAmount < minWithdrawal) {
-        return res.status(400).json({ error: `الحد الأدنى للسحب هو ${minWithdrawal}$` });
-      }
-
-      // Check once every 15 days restriction
-      const lastWithdrawal = (await db.select()
-        .from(withdrawals)
-        .where(eq(withdrawals.userId, req.user.id))
-        .orderBy(desc(withdrawals.createdAt))
-        .limit(1))[0];
-
-      if (lastWithdrawal) {
-        const lastDate = new Date(lastWithdrawal.createdAt).getTime();
-        const now = Date.now();
-        const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
-        if (now - lastDate < fifteenDaysMs) {
-          const daysLeft = Math.ceil((fifteenDaysMs - (now - lastDate)) / (24 * 60 * 60 * 1000));
-          return res.status(400).json({ 
-            error: `عذراً، مسموح لك بسحب أرباحك مرة واحدة كل 15 يوماً فقط. يمكنك تقديم طلب سحب جديد بعد ${daysLeft} يوم.` 
-          });
-        }
+        return res.status(400).json({ error: `الحد الأدنى للسحب هو ${minWithdrawal.toFixed(2)}$` });
       }
 
       if (!recipientAddress || recipientAddress.trim().length < 10) {

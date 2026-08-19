@@ -4,6 +4,7 @@ import { tasks, taskCompletions, users, adminLogs, notifications } from '../../s
 import { eq, and, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { WalletService } from '../services/wallet.service';
+import { EmailService } from '../services/email.service';
 
 export const taskController = {
   // --- USER ENDPOINTS ---
@@ -322,22 +323,52 @@ export const taskController = {
             read: false,
             createdAt: new Date(),
           });
+
+          // Send Email notification asynchronously
+          const targetUser = (await tx.select().from(users).where(eq(users.id, completion.userId)))[0];
+          if (targetUser?.email) {
+            EmailService.sendStatusUpdateEmail({
+              userEmail: targetUser.email,
+              userName: targetUser.displayName || targetUser.username,
+              requestType: 'TASK',
+              status: 'APPROVED',
+              amount: completion.reward,
+              reference: taskName,
+              date: new Date(),
+            }).catch(err => console.error('[Email] Failed to send task approval email:', err));
+          }
         } else {
           // Reject with reason
+          const rejectReason = reason ? String(reason).trim() : 'إثبات غير مكتمل أو غير مطابق للشروط';
           await tx.update(taskCompletions).set({
             status: 'REJECTED',
-            rejectionReason: reason ? String(reason).trim() : 'إثبات غير مكتمل أو غير مطابق للشروط',
+            rejectionReason: rejectReason,
           }).where(eq(taskCompletions.id, id));
 
           await tx.insert(notifications).values({
             id: uuidv4(),
             userId: completion.userId,
             title: '❌ تم رفض إثبات المهمة',
-            message: `تم رفض إثبات تنفيذ مهمة "${taskName}". السبب: ${reason || 'إثبات غير مطابق للشروط'}. يمكنك إعادة تنفيذ المهمة وإرسال إثبات صحيح.`,
+            message: `تم رفض إثبات تنفيذ مهمة "${taskName}". السبب: ${rejectReason}. يمكنك إعادة تنفيذ المهمة وإرسال إثبات صحيح.`,
             type: 'WARNING',
             read: false,
             createdAt: new Date(),
           });
+
+          // Send Email notification asynchronously
+          const targetUser = (await tx.select().from(users).where(eq(users.id, completion.userId)))[0];
+          if (targetUser?.email) {
+            EmailService.sendStatusUpdateEmail({
+              userEmail: targetUser.email,
+              userName: targetUser.displayName || targetUser.username,
+              requestType: 'TASK',
+              status: 'REJECTED',
+              amount: completion.reward,
+              reference: taskName,
+              reason: rejectReason,
+              date: new Date(),
+            }).catch(err => console.error('[Email] Failed to send task rejection email:', err));
+          }
         }
 
         await tx.insert(adminLogs).values({

@@ -20,86 +20,94 @@ export async function runDatabaseSeed() {
   try {
     console.log('[Seed Service]: Checking database seed state...');
 
-    // 1. Seed VIP Plans (Strictly ordered: 30, 50, 100, 300, 800 on initial seed)
+    // 1. Seed & Synchronize Official VIP Plans (160% net profit, 30 days duration)
     const targetPlans = [
       {
         level: 1,
-        name: 'VIP 1 - المبتدئ',
-        price: 30,
+        name: 'VIP 1 (المبتدئ)',
+        price: 15,
         durationDays: 30,
-        dailyTasks: 5,
-        dailyAds: 5,
+        dailyTasks: 4,
+        dailyAds: 4,
         status: 'ACTIVE',
       },
       {
         level: 2,
-        name: 'VIP 2 - المتقدم',
-        price: 50,
+        name: 'VIP 2 (المتقدم)',
+        price: 30,
         durationDays: 30,
-        dailyTasks: 8,
-        dailyAds: 7,
+        dailyTasks: 6,
+        dailyAds: 6,
         status: 'ACTIVE',
       },
       {
         level: 3,
-        name: 'VIP 3 - الفضي',
+        name: 'VIP 3 (الفضي)',
         price: 100,
         durationDays: 30,
-        dailyTasks: 12,
-        dailyAds: 10,
+        dailyTasks: 8,
+        dailyAds: 8,
         status: 'ACTIVE',
       },
       {
         level: 4,
-        name: 'VIP 4 - الذهبي',
-        price: 300,
+        name: 'VIP 4 (الذهبي)',
+        price: 250,
+        durationDays: 30,
+        dailyTasks: 12,
+        dailyAds: 12,
+        status: 'ACTIVE',
+      },
+      {
+        level: 5,
+        name: 'VIP 5 (البلاتيني)',
+        price: 500,
+        durationDays: 30,
+        dailyTasks: 16,
+        dailyAds: 16,
+        status: 'ACTIVE',
+      },
+      {
+        level: 6,
+        name: 'VIP 6 (الماسي)',
+        price: 1000,
         durationDays: 30,
         dailyTasks: 20,
         dailyAds: 20,
         status: 'ACTIVE',
       },
-      {
-        level: 5,
-        name: 'VIP 5 - البلاتيني',
-        price: 800,
-        durationDays: 30,
-        dailyTasks: 35,
-        dailyAds: 30,
-        status: 'ACTIVE',
-      },
     ];
 
-    const vipPlansSeeded = (await db.select().from(systemSettings).where(eq(systemSettings.key, 'vip_plans_seeded')))[0];
-    if (!vipPlansSeeded) {
-      const existingVip = await db.select().from(vipPlans);
-      if (existingVip.length === 0) {
-        console.log('[Seed Service]: Initializing VIP Plans (30, 50, 100, 300, 800)...');
-        for (const p of targetPlans) {
-          await db.insert(vipPlans).values({
-            id: uuidv4(),
-            ...p,
-          });
-        }
+    for (const p of targetPlans) {
+      const existingPlan = (await db.select().from(vipPlans).where(eq(vipPlans.level, p.level)))[0];
+      if (!existingPlan) {
+        await db.insert(vipPlans).values({
+          id: uuidv4(),
+          ...p,
+        });
+      } else {
+        await db.update(vipPlans).set({
+          name: p.name,
+          price: p.price,
+          durationDays: p.durationDays,
+          dailyTasks: p.dailyTasks,
+          dailyAds: p.dailyAds,
+          status: p.status,
+        }).where(eq(vipPlans.id, existingPlan.id));
       }
-      await db.insert(systemSettings).values({
-        key: 'vip_plans_seeded',
-        value: 'true',
-        description: 'Flag indicating initial VIP plans have been seeded',
-        updatedAt: new Date()
-      });
-      console.log('[Seed Service]: VIP Plans synchronized successfully.');
     }
+    console.log('[Seed Service]: VIP Plans synchronized successfully (VIP 1 to VIP 6).');
 
     // 2. Seed System Settings
     const defaultSettings = [
       { key: 'min_deposit', value: '5', description: 'الحد الأدنى للإيداع (USD)' },
-      { key: 'min_withdrawal', value: '50', description: 'الحد الأدنى للسحب (USD)' },
-      { key: 'withdrawal_fee_percent', value: '2', description: 'نسبة عمولة السحب (%)' },
-      { key: 'usdt_trc20_address', value: 'TXk7UqP99s2LmW5eL89fGHkJqZaN48vQrP', description: 'عنوان محفظة الإيداع USDT TRC20' },
-      { key: 'usdt_bep20_address', value: '0x71C...B29F4a1', description: 'عنوان محفظة الإيداع USDT BEP20' },
+      { key: 'min_withdrawal', value: '5', description: 'الحد الأدنى للسحب (USD)' },
+      { key: 'withdrawal_fee_percent', value: '0', description: 'نسبة عمولة السحب (%)' },
+      { key: 'usdt_trc20_address', value: 'TYDZSxdvcr7x557yU7wT34C7yM7yT6k7Wb', description: 'عنوان محفظة الإيداع USDT TRC20' },
+      { key: 'usdt_bep20_address', value: '0x71C8395B28b849202F23175B83B9272B29F4a1D8', description: 'عنوان محفظة الإيداع USDT BEP20' },
       { key: 'telegram_support_link', value: 'https://t.me/NexoraSupport', description: 'رابط الدعم الفني تيليجرام' },
       { key: 'whatsapp_support_link', value: '+1234567890', description: 'رقم دعم واتساب' },
-      { key: 'platform_name', value: 'Nexora Financial Matrix', description: 'اسم المنصة' },
+      { key: 'platform_name', value: 'Nexora Financial System', description: 'اسم المنصة' },
       { key: 'referral_bonus_percent', value: '10', description: 'نسبة أرباح الإحالة (%)' },
     ];
 
@@ -112,6 +120,9 @@ export async function runDatabaseSeed() {
           description: setting.description,
           updatedAt: new Date(),
         });
+      } else if (setting.key === 'min_withdrawal') {
+        // Ensure min_withdrawal is synchronized to 5
+        await db.update(systemSettings).set({ value: '5', updatedAt: new Date() }).where(eq(systemSettings.key, 'min_withdrawal'));
       }
     }
 

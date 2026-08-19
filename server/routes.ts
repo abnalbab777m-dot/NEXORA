@@ -137,6 +137,7 @@ router.get('/admin/settings', adminController.getSettings);
 router.post('/admin/settings', adminController.updateSettings);
 router.patch('/admin/settings', adminController.updateSettings);
 router.post('/admin/telegram/test', adminController.testTelegram);
+router.post('/admin/email/test', adminController.testEmail);
 
 router.get('/admin/tasks', taskController.getAdminTasks);
 router.post('/admin/tasks', taskController.createTask);

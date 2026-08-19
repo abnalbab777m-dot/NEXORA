@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: Record<string, { value: string; description: string }> =
     description: 'عنوان محفظة USDT (TRC20) الرسمية للمنصة لاستلام الإيداعات',
   },
   min_withdrawal: {
-    value: '50.00',
+    value: '5.00',
     description: 'الحد الأدنى لمبلغ السحب بالدولار',
   },
   min_deposit: {
@@ -44,6 +44,30 @@ const DEFAULT_SETTINGS: Record<string, { value: string; description: string }> =
   telegram_admin_chat_id: {
     value: '',
     description: 'معرف الدردشة أو القناة للإدارة (Admin Chat ID) لاستلام الإشعارات الفورية',
+  },
+  smtp_host: {
+    value: '',
+    description: 'اسم خادم البريد (SMTP Host) مثل smtp.gmail.com أو mail.example.com',
+  },
+  smtp_port: {
+    value: '587',
+    description: 'منفذ خادم البريد (SMTP Port) الافتراضي 587 أو 465',
+  },
+  smtp_user: {
+    value: '',
+    description: 'اسم مستخدم أو بريد خادم SMTP',
+  },
+  smtp_pass: {
+    value: '',
+    description: 'كلمة مرور خادم SMTP أو App Password',
+  },
+  smtp_from: {
+    value: 'Nexora Platform <notifications@nexora.com>',
+    description: 'عنوان البريد الإلكتروني للمرسل الذي يظهر للمستخدمين',
+  },
+  smtp_secure: {
+    value: 'false',
+    description: 'تفعيل التشفير الآمن SSL/TLS (true أو false)',
   },
 };
 

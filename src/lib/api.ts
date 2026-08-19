@@ -360,6 +360,15 @@ export const api = {
       return handleResponse(res);
     },
 
+    async testEmail(data?: { host?: string; port?: number; user?: string; pass?: string; secure?: boolean; toEmail?: string }) {
+      const res = await fetchWithAuth(`${API_BASE}/admin/email/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data || {}),
+      });
+      return handleResponse(res);
+    },
+
     async getUsers() {
       const res = await fetchWithAuth(`${API_BASE}/admin/users`);
       return handleResponse(res);

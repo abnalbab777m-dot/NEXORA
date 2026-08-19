@@ -5,6 +5,7 @@ import { eq, desc, sql, and } from 'drizzle-orm';
 import { WalletService } from '../services/wallet.service';
 import { SettingsService } from '../services/settings.service';
 import { TelegramService } from '../services/telegram.service';
+import { EmailService } from '../services/email.service';
 import { v4 as uuidv4 } from 'uuid';
 
 export const adminController = {
@@ -313,6 +314,20 @@ export const adminController = {
           read: false,
           createdAt: new Date(),
         });
+
+        // Send Email notification to user asynchronously
+        const targetUser = (await tx.select().from(users).where(eq(users.id, deposit.userId)))[0];
+        if (targetUser?.email) {
+          EmailService.sendStatusUpdateEmail({
+            userEmail: targetUser.email,
+            userName: targetUser.displayName || targetUser.username,
+            requestType: 'DEPOSIT',
+            status: 'APPROVED',
+            amount: depositAmount,
+            reference: deposit.reference || id,
+            date: new Date(),
+          }).catch(err => console.error('[Email] Failed to send deposit approval email:', err));
+        }
         
         // Log
         await tx.insert(adminLogs).values({
@@ -418,6 +433,20 @@ export const adminController = {
           createdAt: new Date(),
         });
 
+        // Send Email notification to user asynchronously
+        const targetUser = (await tx.select().from(users).where(eq(users.id, deposit.userId)))[0];
+        if (targetUser?.email) {
+          EmailService.sendStatusUpdateEmail({
+            userEmail: targetUser.email,
+            userName: targetUser.displayName || targetUser.username,
+            requestType: 'DEPOSIT',
+            status: 'REJECTED',
+            amount: depositAmount,
+            reason: rejectReason,
+            date: new Date(),
+          }).catch(err => console.error('[Email] Failed to send deposit rejection email:', err));
+        }
+
         // Log
         await tx.insert(adminLogs).values({
           id: uuidv4(),
@@ -521,6 +550,21 @@ export const adminController = {
           read: false,
           createdAt: new Date(),
         });
+
+        // Send Email notification to user asynchronously
+        const targetUser = (await tx.select().from(users).where(eq(users.id, withdrawal.userId)))[0];
+        if (targetUser?.email) {
+          EmailService.sendStatusUpdateEmail({
+            userEmail: targetUser.email,
+            userName: targetUser.displayName || targetUser.username,
+            requestType: 'WITHDRAWAL',
+            status: 'APPROVED',
+            amount: withdrawalAmount,
+            reference: withdrawal.reference || undefined,
+            txHash: txHash || undefined,
+            date: new Date(),
+          }).catch(err => console.error('[Email] Failed to send withdrawal approval email:', err));
+        }
 
         // Log
         await tx.insert(adminLogs).values({
@@ -626,6 +670,20 @@ export const adminController = {
           read: false,
           createdAt: new Date(),
         });
+
+        // Send Email notification to user asynchronously
+        const targetUser = (await tx.select().from(users).where(eq(users.id, withdrawal.userId)))[0];
+        if (targetUser?.email) {
+          EmailService.sendStatusUpdateEmail({
+            userEmail: targetUser.email,
+            userName: targetUser.displayName || targetUser.username,
+            requestType: 'WITHDRAWAL',
+            status: 'REJECTED',
+            amount: withdrawalAmount,
+            reason: rejectReason,
+            date: new Date(),
+          }).catch(err => console.error('[Email] Failed to send withdrawal rejection email:', err));
+        }
 
         // Log
         await tx.insert(adminLogs).values({
@@ -763,6 +821,27 @@ export const adminController = {
       return res.json({ message: result.message, ...result });
     } catch (error) {
       next(error);
+    }
+  },
+
+  // Test SMTP Email Service Connection
+  async testEmail(req: any, res: Response, next: NextFunction) {
+    try {
+      const { host, port, user, pass, secure, toEmail } = req.body || {};
+      const result = await EmailService.testConnection({
+        host,
+        port: port ? parseInt(port, 10) : undefined,
+        user,
+        pass,
+        secure: secure === true || secure === 'true',
+        toEmail: toEmail || req.user?.email || 'admin@nexora.com',
+      });
+      if (!result.success) {
+        return res.status(400).json({ error: result.message, ...result });
+      }
+      return res.json({ message: result.message, ...result });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message || 'خطأ أثناء اختبار خادم البريد' });
     }
   }
 };

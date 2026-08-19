@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useWallet } from '../context/WalletContext';
+import { useToast } from '../components/ui/Toast';
 import { api } from '../lib/api';
 import { Notification } from '../types/models';
 import CustomerSupportFloating from '../components/CustomerSupportFloating';
@@ -37,11 +39,12 @@ const navItems = [
 
 export default function DashboardLayout() {
   const { logout, isAdmin, profile } = useAuth();
+  const { refreshWallet } = useWallet();
+  const toast = useToast();
   const navigate = useNavigate();
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const knownNotifIdsRef = useRef<Set<string>>(new Set());
   const isFirstLoadRef = useRef(true);
 
@@ -67,6 +70,26 @@ export default function DashboardLayout() {
     }
   };
 
+  const showNotificationToast = (notif: Notification) => {
+    const type = (notif.type || '').toUpperCase();
+    const title = notif.title || 'إشعار جديد';
+    const message = notif.message || '';
+
+    if (type === 'SUCCESS') {
+      toast.success(title, message);
+    } else if (type === 'ERROR') {
+      toast.error(title, message);
+    } else if (type === 'WARNING') {
+      toast.warning(title, message);
+    } else {
+      toast.info(title, message);
+    }
+    playChime();
+    
+    // Refresh financial stats when relevant update occurs
+    refreshWallet().catch(() => {});
+  };
+
   const fetchNotifs = async () => {
     if (!profile) return;
     try {
@@ -75,11 +98,10 @@ export default function DashboardLayout() {
       
       // Detect newly arrived notifications to trigger live in-app toast
       if (!isFirstLoadRef.current) {
-        const brandNew = fetched.find(n => !n.read && !knownNotifIdsRef.current.has(n.id || n.notificationId || ''));
-        if (brandNew) {
-          setActiveToast(brandNew);
-          playChime();
-        }
+        const brandNewList = fetched.filter(n => !n.read && !knownNotifIdsRef.current.has(n.id || n.notificationId || ''));
+        brandNewList.forEach(item => {
+          showNotificationToast(item);
+        });
       } else {
         isFirstLoadRef.current = false;
       }
@@ -94,18 +116,10 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 10000);
+    // Fast polling every 5 seconds for immediate real-time updates
+    const interval = setInterval(fetchNotifs, 5000);
     return () => clearInterval(interval);
   }, [profile]);
-
-  // Auto-dismiss active live toast after 6 seconds
-  useEffect(() => {
-    if (!activeToast) return;
-    const t = setTimeout(() => {
-      setActiveToast(null);
-    }, 6000);
-    return () => clearTimeout(t);
-  }, [activeToast]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -134,7 +148,6 @@ export default function DashboardLayout() {
       markAsRead(notifId);
     }
     setShowNotifications(false);
-    setActiveToast(null);
 
     // Smart routing based on notification content
     const text = (notif.title + ' ' + notif.message).toLowerCase();
@@ -165,41 +178,6 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex h-screen bg-neutral-950 text-neutral-50 font-sans">
-      {/* Real-time In-app Floating Toast Alert */}
-      {activeToast && (
-        <div 
-          id="in-app-notification-toast"
-          className="fixed top-4 right-4 md:right-8 z-50 max-w-md w-[calc(100%-2rem)] bg-neutral-900/95 border border-amber-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-top-4 duration-300 flex items-start gap-3 cursor-pointer hover:border-amber-500/80 transition-all ring-1 ring-amber-500/20"
-          onClick={() => handleNotificationClick(activeToast)}
-        >
-          <div className="p-2 rounded-xl bg-neutral-800/80 mt-0.5">
-            {getIcon(activeToast.type)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-sm font-bold text-white truncate">{activeToast.title}</h4>
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveToast(null);
-                }}
-                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-neutral-300 mt-1 line-clamp-2 leading-relaxed">
-              {activeToast.message}
-            </p>
-            <div className="flex items-center justify-between mt-2 text-[10px] text-amber-400 font-medium">
-              <span>انقر للعرض</span>
-              <span className="text-neutral-500">الآن</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Sidebar */}
       <aside className="w-64 border-l border-neutral-800 bg-neutral-900/30 flex flex-col hidden md:flex">
         <div className="h-16 flex items-center px-6 border-b border-neutral-800">

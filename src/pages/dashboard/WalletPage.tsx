@@ -189,7 +189,7 @@ export default function WalletPage() {
 
     const amountNum = parseFloat(withdrawAmount);
     const available = Number(wallet?.availableBalance || 0);
-    const minLimit = Number(selectedWithdrawMethod.minLimit) || 10;
+    const minLimit = Number(selectedWithdrawMethod.minLimit) || 5;
     const maxLimit = Number(selectedWithdrawMethod.maxLimit) || 50000;
 
     if (isNaN(amountNum) || amountNum < minLimit) {

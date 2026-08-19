@@ -27,7 +27,10 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
-  HelpCircle
+  HelpCircle,
+  Mail,
+  AtSign,
+  Server
 } from 'lucide-react';
 import { api } from '../../lib/api';
 
@@ -37,12 +40,14 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingTelegram, setTestingTelegram] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showBotToken, setShowBotToken] = useState(false);
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
 
   // Settings state
   const [usdtAddress, setUsdtAddress] = useState('TYDZSxdvcr7x557yU7wT34C7yM7yT6k7Wb');
-  const [minWithdrawal, setMinWithdrawal] = useState('50.00');
+  const [minWithdrawal, setMinWithdrawal] = useState('5.00');
   const [minDeposit, setMinDeposit] = useState('5.00');
   const [networkName, setNetworkName] = useState('TRON / TRC20');
   const [announcement, setAnnouncement] = useState('مرحباً بكم في منصة Nexora. الدفع والسحب متاحان على مدار الساعة.');
@@ -57,6 +62,19 @@ export default function AdminSettings() {
     message: string;
     botName?: string;
     username?: string;
+  } | null>(null);
+
+  // Email / SMTP Notifications state
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('587');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFrom, setSmtpFrom] = useState('Nexora Platform <notifications@nexora.com>');
+  const [smtpSecure, setSmtpSecure] = useState('false');
+  const [testToEmail, setTestToEmail] = useState('');
+  const [emailTestStatus, setEmailTestStatus] = useState<{
+    success: boolean;
+    message: string;
   } | null>(null);
 
   useEffect(() => {
@@ -85,6 +103,12 @@ export default function AdminSettings() {
         if (data.settings.telegram_admin_chat_id) {
           setTelegramAdminChatId(data.settings.telegram_admin_chat_id);
         }
+        if (data.settings.smtp_host) setSmtpHost(data.settings.smtp_host);
+        if (data.settings.smtp_port) setSmtpPort(data.settings.smtp_port);
+        if (data.settings.smtp_user) setSmtpUser(data.settings.smtp_user);
+        if (data.settings.smtp_pass) setSmtpPass(data.settings.smtp_pass);
+        if (data.settings.smtp_from) setSmtpFrom(data.settings.smtp_from);
+        if (data.settings.smtp_secure) setSmtpSecure(data.settings.smtp_secure);
       }
     } catch (err: any) {
       toast.error('فشل في جلب الإعدادات', err.message);
@@ -138,6 +162,46 @@ export default function AdminSettings() {
     }
   };
 
+  const handleTestEmail = async () => {
+    if (!smtpHost.trim()) {
+      toast.warning('يرجى إدخال اسم خادم البريد (SMTP Host) أولاً');
+      return;
+    }
+    if (!smtpUser.trim()) {
+      toast.warning('يرجى إدخال اسم المستخدم أو البريد (SMTP User) أولاً');
+      return;
+    }
+
+    setTestingEmail(true);
+    setEmailTestStatus(null);
+
+    try {
+      const res = await api.admin.testEmail({
+        host: smtpHost.trim(),
+        port: parseInt(smtpPort, 10) || 587,
+        user: smtpUser.trim(),
+        pass: smtpPass.trim(),
+        secure: smtpSecure === 'true' || smtpPort === '465',
+        toEmail: testToEmail.trim() || undefined,
+      });
+
+      setEmailTestStatus({
+        success: true,
+        message: res.message || 'تم التحقق من خادم SMTP وإرسال البريد التجريبي بنجاح!',
+      });
+
+      toast.success('نجح اختبار البريد!', 'تم الاتصال بخادم SMTP والتحقق من صلاحية الإرسال.');
+    } catch (err: any) {
+      setEmailTestStatus({
+        success: false,
+        message: err.message || 'فشل الاتصال بخادم البريد. تأكد من صحة بيانات الخادم وكلمة المرور.',
+      });
+      toast.error('فشل اختبار خدمة البريد', err.message);
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -172,11 +236,17 @@ export default function AdminSettings() {
         whatsapp_support: whatsappSupport.trim(),
         telegram_bot_token: telegramBotToken.trim(),
         telegram_admin_chat_id: telegramAdminChatId.trim(),
+        smtp_host: smtpHost.trim(),
+        smtp_port: smtpPort.trim(),
+        smtp_user: smtpUser.trim(),
+        smtp_pass: smtpPass.trim(),
+        smtp_from: smtpFrom.trim(),
+        smtp_secure: smtpSecure,
       });
 
       toast.success(
         'تم حفظ الإعدادات بنجاح!',
-        'تم تحديث إعدادات النظام ومحفظة المنصة وبوت التيليجرام فوراً.'
+        'تم تحديث إعدادات النظام ومحفظة المنصة وبوت التيليجرام وخدمة البريد فوراً.'
       );
     } catch (err: any) {
       toast.error('فشل في حفظ الإعدادات', err.message);
@@ -410,6 +480,241 @@ export default function AdminSettings() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Email / SMTP Service Notifications Card */}
+        <Card className="border-amber-500/30 bg-gradient-to-b from-amber-950/20 via-neutral-900/50 to-neutral-900/40 shadow-xl">
+          <CardHeader className="border-b border-neutral-800/80 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/30 shadow-inner">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg text-white">خدمة مراسلة البريد الإلكتروني التلقائي (SMTP / Email)</CardTitle>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      إشعارات فورية للعملاء
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    إرسال بريد إلكتروني فوري للمستخدم عند قبول أو رفض طلب الإيداع، السحب، إثباتات المهام، أو ترقية الباقة.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status indicator */}
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                {smtpHost && smtpUser ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    البريد مفعل ومربوط
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-neutral-800 text-neutral-400 border border-neutral-700">
+                    <span className="w-2 h-2 rounded-full bg-neutral-500"></span>
+                    وضع المحاكاة الافتراضي
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-5 pt-4">
+            <div className="p-3.5 bg-amber-950/20 border border-amber-800/30 rounded-xl flex items-start gap-3">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-neutral-300 leading-relaxed">
+                <span className="font-bold text-amber-300">مراسلة فورية ذكية:</span> يقوم النظام آلياً بإنشاء رسائل HTML منسقة واحترافية للمستخدم عند تحديث حالة أي طلب تحتوي على تفاصيل العملية ورقم المعاملة (TXID) وبيان النتيجة وسبب الرفض إن وجد.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* SMTP Host */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                  <Server className="w-3.5 h-3.5 text-amber-400" />
+                  خادم البريد (SMTP Host)
+                </label>
+                <Input
+                  id="admin-smtp-host"
+                  value={smtpHost}
+                  onChange={e => setSmtpHost(e.target.value)}
+                  placeholder="smtp.gmail.com أو mail.domain.com"
+                  dir="ltr"
+                  className="font-mono text-xs bg-neutral-950 border-neutral-800 text-neutral-200"
+                />
+                <p className="text-[11px] text-neutral-500">
+                  عنوان خادم إرسال البريد
+                </p>
+              </div>
+
+              {/* SMTP Port */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                  <Settings className="w-3.5 h-3.5 text-neutral-400" />
+                  منفذ الخادم (SMTP Port)
+                </label>
+                <Input
+                  id="admin-smtp-port"
+                  value={smtpPort}
+                  onChange={e => setSmtpPort(e.target.value)}
+                  placeholder="587 أو 465 أو 25"
+                  dir="ltr"
+                  className="font-mono text-xs bg-neutral-950 border-neutral-800 text-neutral-200"
+                />
+                <p className="text-[11px] text-neutral-500">
+                  الافتراضي: 587 لـ TLS أو 465 لـ SSL
+                </p>
+              </div>
+
+              {/* Secure SSL/TLS */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  تشفير الاتصال (SSL / TLS)
+                </label>
+                <select
+                  id="admin-smtp-secure"
+                  value={smtpSecure}
+                  onChange={e => setSmtpSecure(e.target.value)}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-500/50"
+                >
+                  <option value="false">تلقائي / STARTTLS (منفذ 587)</option>
+                  <option value="true">تشفير كامل SSL/TLS (منفذ 465)</option>
+                </select>
+                <p className="text-[11px] text-neutral-500">
+                  نوع تشفير قناة الاتصال
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* SMTP User */}
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                  <AtSign className="w-3.5 h-3.5 text-amber-400" />
+                  اسم مستخدم البريد (SMTP User)
+                </label>
+                <Input
+                  id="admin-smtp-user"
+                  value={smtpUser}
+                  onChange={e => setSmtpUser(e.target.value)}
+                  placeholder="notifications@nexora.com"
+                  dir="ltr"
+                  className="font-mono text-xs bg-neutral-950 border-neutral-800 text-neutral-200"
+                />
+                <p className="text-[11px] text-neutral-500">
+                  البريد الإلكتروني أو اسم الحساب لدى مزود الخدمة
+                </p>
+              </div>
+
+              {/* SMTP Pass */}
+              <div className="space-y-1.5">
+                <label className="flex items-center justify-between text-xs font-semibold text-neutral-300">
+                  <span className="flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-yellow-500" />
+                    كلمة المرور (SMTP Password / App Password)
+                  </span>
+                </label>
+                <div className="relative">
+                  <Input
+                    id="admin-smtp-pass"
+                    type={showSmtpPass ? "text" : "password"}
+                    value={smtpPass}
+                    onChange={e => setSmtpPass(e.target.value)}
+                    placeholder="كلمة مرور SMTP أو رمز التطبيق..."
+                    dir="ltr"
+                    className="font-mono text-xs bg-neutral-950 border-neutral-800 pr-10 text-neutral-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpPass(!showSmtpPass)}
+                    className="absolute left-3 top-2.5 text-neutral-500 hover:text-neutral-300"
+                  >
+                    {showSmtpPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  في Gmail استخدم "App Password" بدلاً من كلمة المرور العادية
+                </p>
+              </div>
+            </div>
+
+            {/* Sender Name & Email */}
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                <Mail className="w-3.5 h-3.5 text-amber-400" />
+                اسم وعنوان المرسل (Sender From)
+              </label>
+              <Input
+                id="admin-smtp-from"
+                value={smtpFrom}
+                onChange={e => setSmtpFrom(e.target.value)}
+                placeholder="Nexora Platform <notifications@nexora.com>"
+                dir="ltr"
+                className="font-mono text-xs bg-neutral-950 border-neutral-800 text-neutral-200"
+              />
+              <p className="text-[11px] text-neutral-500">
+                الاسم والعنوان الذي يظهر في صندوق بريد العميل عند استلام الإشعار
+              </p>
+            </div>
+
+            {/* Test Email Section */}
+            <div className="pt-3 border-t border-neutral-800/80 space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                    إرسال بريد تجريبي للتأكد من نجاح الإعدادات:
+                  </label>
+                  <Input
+                    id="admin-test-to-email"
+                    type="email"
+                    value={testToEmail}
+                    onChange={e => setTestToEmail(e.target.value)}
+                    placeholder="أدخل بريدك الشخصي لاستلام رسالة التجربة (اختياري)..."
+                    dir="ltr"
+                    className="text-xs bg-neutral-950 border-neutral-800 text-neutral-200"
+                  />
+                </div>
+
+                <Button
+                  id="test-smtp-email-button"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestEmail}
+                  isLoading={testingEmail}
+                  className="border-amber-600/40 text-amber-400 hover:bg-amber-500/10 shrink-0 self-end sm:self-auto"
+                >
+                  <Send className="w-4 h-4 ml-1.5 text-amber-400" />
+                  اختبار إرسال بريد تجريبي
+                </Button>
+              </div>
+
+              {/* Test Status Feedback Box */}
+              {emailTestStatus && (
+                <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-3 transition-all animate-in fade-in duration-200 ${
+                  emailTestStatus.success 
+                    ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' 
+                    : 'bg-rose-950/30 border-rose-500/30 text-rose-300'
+                }`}>
+                  {emailTestStatus.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <span className="font-bold block">
+                      {emailTestStatus.success ? 'نجح اختبار خادم البريد!' : 'فشل اختبار خادم البريد:'}
+                    </span>
+                    <p className="mt-0.5 text-[11px] leading-relaxed opacity-90">
+                      {emailTestStatus.message}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

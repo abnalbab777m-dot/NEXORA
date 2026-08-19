@@ -10,14 +10,17 @@ import routes from './server/routes';
 import { testRouter } from './server/routes/test';
 import { errorHandler } from './server/middlewares/error.middleware';
 import { runDatabaseSeed } from './server/services/seed.service.ts';
+import { runDatabaseCleanup } from './server/services/db-cleanup.service.ts';
 
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  // Run database seeding asynchronously without blocking server listening
-  runDatabaseSeed().catch((seedErr) => {
-    console.error('Initial seed error:', seedErr);
+  // Run database seeding and cleanup asynchronously on startup
+  runDatabaseSeed().then(() => {
+    return runDatabaseCleanup();
+  }).catch((seedErr) => {
+    console.error('Initial seed/cleanup error:', seedErr);
   });
 
   // Trust proxy is needed since we're running behind a reverse proxy

@@ -185,8 +185,25 @@ export const walletController = {
         }
       }
 
+      // Deduplicate reconciled transactions (preserve distinct unique events)
+      const uniqueMap = new Map<string, any>();
+      for (const t of reconciledTxs) {
+        const idKey = t.id;
+        if (!uniqueMap.has(idKey)) {
+          uniqueMap.set(idKey, t);
+        } else {
+          // If already exists, prefer completed/rejected over pending
+          const existing = uniqueMap.get(idKey);
+          if (existing.status === 'PENDING' && t.status !== 'PENDING') {
+            uniqueMap.set(idKey, t);
+          }
+        }
+      }
+
+      const finalTxs = Array.from(uniqueMap.values());
+
       // Sort all reconciled transactions by date descending
-      reconciledTxs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      finalTxs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       // Asynchronously update transactions table in background if any inconsistencies were corrected
       if (updatesToSync.length > 0) {
@@ -203,7 +220,7 @@ export const walletController = {
         })();
       }
 
-      return res.json({ transactions: reconciledTxs });
+      return res.json({ transactions: finalTxs });
     } catch (error) {
       next(error);
     }

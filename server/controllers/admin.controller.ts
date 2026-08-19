@@ -176,6 +176,10 @@ export const adminController = {
   // Financial Requests (Deposits & Withdrawals with user details)
   async getFinancialRequests(req: any, res: Response, next: NextFunction) {
     try {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       const allUsers = await db.select({
         id: users.id,
         username: users.username,
@@ -250,6 +254,21 @@ export const adminController = {
         ).orderBy(desc(transactions.createdAt)).limit(1))[0];
         
         const existingTxId = txRecord ? txRecord.id : id;
+
+        // Explicitly update all related transaction rows directly in transactions table
+        await tx.update(transactions).set({
+          status: 'APPROVED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(eq(transactions.id, id));
+
+        if (existingTxId && existingTxId !== id) {
+          await tx.update(transactions).set({
+            status: 'APPROVED',
+            processedBy: req.user.id,
+            processedAt: new Date(),
+          }).where(eq(transactions.id, existingTxId));
+        }
 
         // Process wallet transaction securely
         await WalletService.processTransactionWithTx(
@@ -326,6 +345,21 @@ export const adminController = {
         
         const existingTxId = txRecord ? txRecord.id : id;
 
+        // Explicitly update all related transaction rows directly in transactions table
+        await tx.update(transactions).set({
+          status: 'REJECTED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(eq(transactions.id, id));
+
+        if (existingTxId && existingTxId !== id) {
+          await tx.update(transactions).set({
+            status: 'REJECTED',
+            processedBy: req.user.id,
+            processedAt: new Date(),
+          }).where(eq(transactions.id, existingTxId));
+        }
+
         // Process wallet transaction securely (updates ledger to REJECTED)
         await WalletService.processTransactionWithTx(
           tx,
@@ -400,6 +434,21 @@ export const adminController = {
         ).orderBy(desc(transactions.createdAt)).limit(1))[0];
         
         const existingTxId = txRecord ? txRecord.id : id;
+
+        // Explicitly update all related transaction rows directly in transactions table
+        await tx.update(transactions).set({
+          status: 'APPROVED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(eq(transactions.id, id));
+
+        if (existingTxId && existingTxId !== id) {
+          await tx.update(transactions).set({
+            status: 'APPROVED',
+            processedBy: req.user.id,
+            processedAt: new Date(),
+          }).where(eq(transactions.id, existingTxId));
+        }
 
         // Process wallet securely (moves from pending to totalWithdrawals)
         await WalletService.processTransactionWithTx(
@@ -476,6 +525,21 @@ export const adminController = {
         ).orderBy(desc(transactions.createdAt)).limit(1))[0];
         
         const existingTxId = txRecord ? txRecord.id : id;
+
+        // Explicitly update all related transaction rows directly in transactions table
+        await tx.update(transactions).set({
+          status: 'REJECTED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(eq(transactions.id, id));
+
+        if (existingTxId && existingTxId !== id) {
+          await tx.update(transactions).set({
+            status: 'REJECTED',
+            processedBy: req.user.id,
+            processedAt: new Date(),
+          }).where(eq(transactions.id, existingTxId));
+        }
 
         // Process refund in wallet (REJECTED status automatically adds amount back to available and deducts from pending!)
         await WalletService.processTransactionWithTx(

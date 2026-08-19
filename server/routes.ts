@@ -29,6 +29,8 @@ router.post('/user/pin', requireAuth, userController.setTransactionPin);
 // --- Wallet Routes ---
 router.get('/wallet', requireAuth, walletController.getWallet);
 router.get('/wallet/transactions', requireAuth, walletController.getTransactions);
+router.get('/transactions', requireAuth, walletController.getTransactions);
+router.get('/wallet/history', requireAuth, walletController.getTransactions);
 router.post('/deposits', requireAuth, validate(depositSchema), walletController.requestDeposit);
 router.get('/deposits', requireAuth, walletController.getDeposits);
 router.post('/withdrawals', requireAuth, validate(withdrawSchema), walletController.requestWithdrawal);

@@ -248,50 +248,66 @@ export default function WalletPage() {
 
   // Transaction Status Helpers
   const getStatusBadge = (status: string) => {
-    const st = (status || '').toUpperCase();
-    if (st === 'COMPLETED' || st === 'APPROVED') {
+    const s = String(status || '').toLowerCase().trim();
+    
+    // Completed / Approved / Success / مكتمل
+    if (
+      s.includes('complete') || 
+      s.includes('approved') || 
+      s.includes('success') || 
+      s.includes('مكتمل') || 
+      s.includes('موافق') ||
+      s.includes('مؤكد')
+    ) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
           <CheckCircle2 className="w-3.5 h-3.5" /> مكتمل
         </span>
       );
     }
-    if (st === 'PENDING') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-          <Clock className="w-3.5 h-3.5 animate-pulse" /> قيد المراجعة
-        </span>
-      );
-    }
-    if (st === 'REJECTED' || st === 'CANCELLED' || st === 'FAILED') {
+    
+    // Rejected / Failed / Cancelled / Declined / مرفوض
+    if (
+      s.includes('reject') || 
+      s.includes('fail') || 
+      s.includes('cancel') || 
+      s.includes('decline') || 
+      s.includes('مرفوض') ||
+      s.includes('ملغي')
+    ) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
           <XCircle className="w-3.5 h-3.5" /> مرفوض
         </span>
       );
     }
+    
+    // Default Pending
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-neutral-800 text-neutral-400">
-        {status}
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <Clock className="w-3.5 h-3.5 animate-pulse" /> قيد المراجعة
       </span>
     );
   };
 
   const getDynamicDescription = (tx: any) => {
-    const st = (tx.status || '').toUpperCase();
+    const s = String(tx.status || '').toLowerCase().trim();
     let baseText = tx.description || `عملية ${tx.type}`;
     
+    const isCompleted = s.includes('complete') || s.includes('approved') || s.includes('success') || s.includes('مكتمل') || s.includes('مؤكد');
+    const isRejected = s.includes('reject') || s.includes('fail') || s.includes('cancel') || s.includes('decline') || s.includes('مرفوض');
+
     if (tx.type === 'DEPOSIT') {
-      if (st === 'COMPLETED' || st === 'APPROVED') baseText = "إيداع مؤكد";
-      else if (st === 'REJECTED' || st === 'FAILED' || st === 'CANCELLED') baseText = "طلب إيداع مرفوض";
-      else if (st === 'PENDING') baseText = "طلب إيداع قيد المراجعة";
+      if (isCompleted) baseText = "إيداع مؤكد";
+      else if (isRejected) baseText = "طلب إيداع مرفوض";
+      else baseText = "طلب إيداع قيد المراجعة";
     } else if (tx.type === 'WITHDRAWAL') {
-      if (st === 'COMPLETED' || st === 'APPROVED') baseText = "سحب مؤكد";
-      else if (st === 'REJECTED' || st === 'FAILED' || st === 'CANCELLED') baseText = "طلب سحب مرفوض";
-      else if (st === 'PENDING') baseText = "طلب سحب قيد المراجعة";
+      if (isCompleted) baseText = "سحب مؤكد";
+      else if (isRejected) baseText = "طلب سحب مرفوض";
+      else baseText = "طلب سحب قيد المراجعة";
     }
     
-    // Extract TXID or Hash if it exists in the original description to keep context
+    // Extract TXID or Hash or wallet reference if it exists in the original description to keep context
     if (tx.description) {
       const match = tx.description.match(/\(TXID:[^)]+\)/i) || tx.description.match(/\(Hash:[^)]+\)/i) || tx.description.match(/إلى محفظة:[^)]+/i);
       if (match) {

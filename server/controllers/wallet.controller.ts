@@ -32,6 +32,10 @@ export const amountSchema = depositSchema;
 export const walletController = {
   async getWallet(req: any, res: Response, next: NextFunction) {
     try {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
       let wallet = (await db.select().from(wallets).where(eq(wallets.userId, req.user.id)))[0];
       if (!wallet) {
         await db.insert(wallets).values({
@@ -52,10 +56,152 @@ export const walletController = {
 
   async getTransactions(req: any, res: Response, next: NextFunction) {
     try {
-      const txs = await db.select().from(transactions)
-        .where(eq(transactions.userId, req.user.id))
-        .orderBy(desc(transactions.createdAt));
-      return res.json({ transactions: txs });
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+
+      const [txs, userDeposits, userWithdrawals] = await Promise.all([
+        db.select().from(transactions)
+          .where(eq(transactions.userId, req.user.id))
+          .orderBy(desc(transactions.createdAt)),
+        db.select().from(deposits)
+          .where(eq(deposits.userId, req.user.id))
+          .orderBy(desc(deposits.createdAt)),
+        db.select().from(withdrawals)
+          .where(eq(withdrawals.userId, req.user.id))
+          .orderBy(desc(withdrawals.createdAt)),
+      ]);
+
+      const reconciledTxs = [...txs];
+      const updatesToSync: Array<{ id: string; status: string }> = [];
+
+      for (const tx of reconciledTxs) {
+        if (tx.type === 'DEPOSIT') {
+          // Find matching deposit
+          const matchedDeposit = userDeposits.find(d => 
+            d.id === tx.id || 
+            (Math.abs(Number(d.amount) - Number(tx.amount)) < 0.001 && (
+              (d.reference && tx.description && tx.description.includes(d.reference)) ||
+              Math.abs(new Date(d.createdAt).getTime() - new Date(tx.createdAt).getTime()) < 180000
+            ))
+          );
+
+          if (matchedDeposit) {
+            const depSt = String(matchedDeposit.status || '').toUpperCase();
+            let targetStatus = tx.status;
+            if (depSt === 'APPROVED' || depSt === 'COMPLETED') {
+              targetStatus = 'COMPLETED';
+            } else if (depSt === 'REJECTED' || depSt === 'CANCELLED') {
+              targetStatus = 'REJECTED';
+            } else if (depSt === 'PENDING') {
+              targetStatus = 'PENDING';
+            }
+
+            if (tx.status !== targetStatus) {
+              tx.status = targetStatus;
+              updatesToSync.push({ id: tx.id, status: targetStatus });
+            }
+          }
+        } else if (tx.type === 'WITHDRAWAL') {
+          // Find matching withdrawal
+          const matchedWithdrawal = userWithdrawals.find(w => 
+            w.id === tx.id || 
+            (Math.abs(Number(w.amount) - Number(tx.amount)) < 0.001 && (
+              (w.reference && tx.description && tx.description.includes(w.reference)) ||
+              Math.abs(new Date(w.createdAt).getTime() - new Date(tx.createdAt).getTime()) < 180000
+            ))
+          );
+
+          if (matchedWithdrawal) {
+            const withSt = String(matchedWithdrawal.status || '').toUpperCase();
+            let targetStatus = tx.status;
+            if (withSt === 'APPROVED' || withSt === 'COMPLETED') {
+              targetStatus = 'COMPLETED';
+            } else if (withSt === 'REJECTED' || withSt === 'CANCELLED') {
+              targetStatus = 'REJECTED';
+            } else if (withSt === 'PENDING') {
+              targetStatus = 'PENDING';
+            }
+
+            if (tx.status !== targetStatus) {
+              tx.status = targetStatus;
+              updatesToSync.push({ id: tx.id, status: targetStatus });
+            }
+          }
+        }
+      }
+
+      // Check for any deposits that might be completely missing from transactions table
+      for (const dep of userDeposits) {
+        const existsInTxs = reconciledTxs.some(t => 
+          t.id === dep.id || 
+          (t.type === 'DEPOSIT' && Math.abs(Number(t.amount) - Number(dep.amount)) < 0.001 && Math.abs(new Date(t.createdAt).getTime() - new Date(dep.createdAt).getTime()) < 180000)
+        );
+        if (!existsInTxs) {
+          const depSt = String(dep.status || '').toUpperCase();
+          const synStatus = (depSt === 'APPROVED' || depSt === 'COMPLETED') ? 'COMPLETED' : (depSt === 'REJECTED' ? 'REJECTED' : 'PENDING');
+          reconciledTxs.push({
+            id: dep.id,
+            userId: req.user.id,
+            type: 'DEPOSIT',
+            amount: Number(dep.amount),
+            currency: 'USD',
+            status: synStatus,
+            description: dep.reference ? `طلب إيداع (TXID: ${dep.reference})` : 'طلب إيداع',
+            balanceBefore: null,
+            balanceAfter: null,
+            createdAt: dep.createdAt,
+            processedAt: dep.updatedAt || null,
+            processedBy: null
+          });
+        }
+      }
+
+      // Check for any withdrawals that might be completely missing from transactions table
+      for (const w of userWithdrawals) {
+        const existsInTxs = reconciledTxs.some(t => 
+          t.id === w.id || 
+          (t.type === 'WITHDRAWAL' && Math.abs(Number(t.amount) - Number(w.amount)) < 0.001 && Math.abs(new Date(t.createdAt).getTime() - new Date(w.createdAt).getTime()) < 180000)
+        );
+        if (!existsInTxs) {
+          const withSt = String(w.status || '').toUpperCase();
+          const synStatus = (withSt === 'APPROVED' || withSt === 'COMPLETED') ? 'COMPLETED' : (withSt === 'REJECTED' ? 'REJECTED' : 'PENDING');
+          reconciledTxs.push({
+            id: w.id,
+            userId: req.user.id,
+            type: 'WITHDRAWAL',
+            amount: Number(w.amount),
+            currency: 'USD',
+            status: synStatus,
+            description: w.reference ? `طلب سحب إلى محفظة: ${w.reference}` : 'طلب سحب',
+            balanceBefore: null,
+            balanceAfter: null,
+            createdAt: w.createdAt,
+            processedAt: w.updatedAt || null,
+            processedBy: null
+          });
+        }
+      }
+
+      // Sort all reconciled transactions by date descending
+      reconciledTxs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      // Asynchronously update transactions table in background if any inconsistencies were corrected
+      if (updatesToSync.length > 0) {
+        (async () => {
+          try {
+            for (const item of updatesToSync) {
+              await db.update(transactions)
+                .set({ status: item.status })
+                .where(eq(transactions.id, item.id));
+            }
+          } catch (syncErr) {
+            console.error('Background transaction status sync error:', syncErr);
+          }
+        })();
+      }
+
+      return res.json({ transactions: reconciledTxs });
     } catch (error) {
       next(error);
     }

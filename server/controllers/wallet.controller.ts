@@ -97,7 +97,7 @@ export const walletController = {
 
         // Insert pending transaction record into ledger
         await tx.insert(transactions).values({
-          id: uuidv4(),
+          id: depositId,
           userId: req.user.id,
           type: 'DEPOSIT',
           amount: numAmount,
@@ -242,7 +242,7 @@ export const walletController = {
 
         // Insert pending transaction record into ledger
         await tx.insert(transactions).values({
-          id: uuidv4(),
+          id: withdrawalId,
           userId: req.user.id,
           type: 'WITHDRAWAL',
           amount: numAmount,

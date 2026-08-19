@@ -247,7 +247,8 @@ export const adminController = {
           'DEPOSIT', 
           'APPROVED', 
           `إيداع مؤكد (TXID: ${deposit.reference || id})`, 
-          req.user.id
+          req.user.id,
+          id // existingTxId matches the depositId
         );
 
         // Update deposit status
@@ -298,6 +299,18 @@ export const adminController = {
         const deposit = (await tx.select().from(deposits).where(eq(deposits.id, id)))[0];
         if (!deposit) throw new Error('طلب الإيداع غير موجود');
         if (deposit.status !== 'PENDING') throw new Error('العملية تمت معالجتها مسبقاً');
+
+        // Process wallet transaction securely (updates ledger to REJECTED)
+        await WalletService.processTransactionWithTx(
+          tx,
+          deposit.userId, 
+          Number(deposit.amount), 
+          'DEPOSIT', 
+          'REJECTED', 
+          `طلب إيداع مرفوض (TXID: ${deposit.reference || id})`, 
+          req.user.id,
+          id // existingTxId
+        );
 
         // Update status to REJECTED
         await tx.update(deposits).set({
@@ -358,7 +371,8 @@ export const adminController = {
           'WITHDRAWAL', 
           'APPROVED', 
           txHash ? `سحب مؤكد (Hash: ${txHash})` : `سحب مؤكد إلى محفظة: ${withdrawal.reference || ''}`, 
-          req.user.id
+          req.user.id,
+          id // existingTxId
         );
 
         // Update withdrawal status
@@ -421,7 +435,8 @@ export const adminController = {
           'WITHDRAWAL', 
           'REJECTED', 
           `استرجاع سحب مرفوض (${rejectReason})`, 
-          req.user.id
+          req.user.id,
+          id // existingTxId
         );
 
         // Update status to REJECTED

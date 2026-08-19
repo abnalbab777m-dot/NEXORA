@@ -11,7 +11,8 @@ export class WalletService {
     type: "DEPOSIT" | "WITHDRAWAL" | "TASK_REWARD" | "AD_REWARD" | "VIP_UPGRADE",
     status: "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "CANCELLED",
     description?: string,
-    adminId?: string
+    adminId?: string,
+    existingTxId?: string
   ) {
       // 1. Get the wallet row for this user
       let wallet = (await tx.select().from(wallets).where(eq(wallets.userId, userId)))[0];
@@ -92,21 +93,33 @@ export class WalletService {
         updatedAt: new Date(),
       }).where(eq(wallets.userId, userId));
 
-      // 4. Create Ledger Record
-      await tx.insert(transactions).values({
-        id: txId,
-        userId: userId,
-        type: type as any,
-        amount: amount,
-        status: status as any,
-        description: description || null,
-        balanceBefore: currentAvailable,
-        balanceAfter: newAvailable,
-        processedBy: adminId || null,
-        processedAt: (status === 'APPROVED' || status === 'COMPLETED' || status === 'REJECTED') ? new Date() : null,
-      });
+      // 4. Create or Update Ledger Record
+      const txIdToUse = existingTxId || txId;
+      if (existingTxId) {
+        await tx.update(transactions).set({
+          status: status as any,
+          description: description || null,
+          balanceBefore: currentAvailable,
+          balanceAfter: newAvailable,
+          processedBy: adminId || null,
+          processedAt: (status === 'APPROVED' || status === 'COMPLETED' || status === 'REJECTED') ? new Date() : null,
+        }).where(eq(transactions.id, existingTxId));
+      } else {
+        await tx.insert(transactions).values({
+          id: txIdToUse,
+          userId: userId,
+          type: type as any,
+          amount: amount,
+          status: status as any,
+          description: description || null,
+          balanceBefore: currentAvailable,
+          balanceAfter: newAvailable,
+          processedBy: adminId || null,
+          processedAt: (status === 'APPROVED' || status === 'COMPLETED' || status === 'REJECTED') ? new Date() : null,
+        });
+      }
 
-      return { txId, newAvailable, newEarnings };
+      return { txId: txIdToUse, newAvailable, newEarnings };
   }
 
   static async processTransaction(
@@ -115,10 +128,11 @@ export class WalletService {
     type: "DEPOSIT" | "WITHDRAWAL" | "TASK_REWARD" | "AD_REWARD" | "VIP_UPGRADE",
     status: "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED" | "CANCELLED",
     description?: string,
-    adminId?: string
+    adminId?: string,
+    existingTxId?: string
   ) {
     return await db.transaction(async (tx) => {
-       return await this.processTransactionWithTx(tx, userId, amount, type, status, description, adminId);
+       return await this.processTransactionWithTx(tx, userId, amount, type, status, description, adminId, existingTxId);
     });
   }
 }

@@ -91,7 +91,9 @@ router.get('/withdrawals', requireAuth, walletController.getWithdrawals);
 // --- Task Routes ---
 router.get('/tasks', requireAuth, taskController.getTasks);
 router.post('/tasks/:id/complete', requireAuth, taskController.completeTask);
+router.post('/tasks/:id/submit', requireAuth, taskController.completeTask);
 router.get('/tasks/completions', requireAuth, taskController.getCompletions);
+router.get('/tasks/submissions', requireAuth, taskController.getCompletions);
 
 // --- VIP Routes ---
 router.get('/vip', requireAuth, vipController.getPlans);
@@ -144,8 +146,13 @@ router.post('/admin/tasks', taskController.createTask);
 router.patch('/admin/tasks/:id', taskController.updateTask);
 router.delete('/admin/tasks/:id', taskController.deleteTask);
 router.get('/admin/task-completions', taskController.getAdminCompletions);
+router.get('/admin/task-submissions', taskController.getAdminCompletions);
 router.get('/admin/task-completions/:id/proof', taskController.getCompletionProof);
+router.get('/admin/task-submissions/:id/proof', taskController.getCompletionProof);
 router.post('/admin/task-completions/:id/approve', taskController.approveCompletion);
+router.post('/admin/task-submissions/:id/approve', taskController.approveSubmission);
+router.post('/admin/task-completions/:id/reject', taskController.rejectSubmission);
+router.post('/admin/task-submissions/:id/reject', taskController.rejectSubmission);
 
 router.get('/admin/ads', adController.getAdminAds);
 router.post('/admin/ads', adController.createAd);

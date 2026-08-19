@@ -27,6 +27,7 @@ import AdminAds from './pages/admin/AdminAds';
 import AdminVIP from './pages/admin/AdminVIP';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminPaymentMethods from './pages/admin/AdminPaymentMethods';
+import AdminTaskReview from './pages/admin/AdminTaskReview';
 
 // Auth Guard
 const RequireAuth = ({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) => {
@@ -68,6 +69,8 @@ export default function App() {
                 <Route path="payment-methods" element={<AdminPaymentMethods />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="tasks" element={<AdminTasks />} />
+                <Route path="task-submissions" element={<AdminTaskReview />} />
+                <Route path="tasks-review" element={<AdminTaskReview />} />
                 <Route path="ads" element={<AdminAds />} />
                 <Route path="vip" element={<AdminVIP />} />
               </Route>

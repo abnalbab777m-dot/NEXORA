@@ -258,7 +258,9 @@ export const taskController = {
 
   async getAdminCompletions(req: Request, res: Response, next: NextFunction) {
     try {
-      const allCompletions = await db
+      const { status } = req.query as { status?: string };
+
+      let query = db
         .select({
           id: taskCompletions.id,
           taskId: taskCompletions.taskId,
@@ -269,17 +271,37 @@ export const taskController = {
           proofAccount: taskCompletions.proofAccount,
           rejectionReason: taskCompletions.rejectionReason,
           completedAt: taskCompletions.completedAt,
+          reviewedAt: taskCompletions.reviewedAt,
+          reviewedBy: taskCompletions.reviewedBy,
           taskTitle: tasks.title,
           taskCategory: tasks.category,
+          taskDescription: tasks.description,
+          taskProofInstructions: tasks.proofInstructions,
+          taskReward: tasks.reward,
+          userDisplayName: users.displayName,
+          userUsername: users.username,
           userEmail: users.email,
           userPhone: users.phone,
+          userVipLevel: users.vipLevel,
         })
         .from(taskCompletions)
         .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
         .leftJoin(users, eq(taskCompletions.userId, users.id))
         .orderBy(desc(taskCompletions.completedAt));
 
-      return res.json({ completions: allCompletions });
+      const allCompletions = await query;
+      
+      let filtered = allCompletions;
+      if (status && status !== 'all') {
+        const normalized = status.toUpperCase();
+        if (normalized === 'APPROVED') {
+          filtered = allCompletions.filter(c => c.status === 'COMPLETED' || c.status === 'APPROVED');
+        } else {
+          filtered = allCompletions.filter(c => c.status === normalized);
+        }
+      }
+
+      return res.json({ completions: filtered, submissions: filtered });
     } catch (error) {
       next(error);
     }
@@ -287,19 +309,102 @@ export const taskController = {
 
   async getCompletionProof(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const completion = (await db.select({ proofImage: taskCompletions.proofImage }).from(taskCompletions).where(eq(taskCompletions.id, id)))[0];
-      if (!completion) return res.status(404).json({ error: 'Not found' });
+      if (!completion) return res.status(404).json({ error: 'طلب إنجاز المهمة غير موجود' });
       return res.json({ proofImage: completion.proofImage });
     } catch (error) {
       next(error);
     }
   },
 
-  async approveCompletion(req: any, res: Response, next: NextFunction) {
+  async approveSubmission(req: any, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const { action, reason } = req.body || {};
+      const adminId = req.user?.id;
+
+      await db.transaction(async (tx) => {
+        const completion = (await tx.select().from(taskCompletions).where(eq(taskCompletions.id, id)))[0];
+        if (!completion) throw new Error('إنجاز المهمة غير موجود');
+        if (completion.status !== 'PENDING') throw new Error('العملية تمت معالجتها مسبقاً');
+
+        const task = (await tx.select().from(tasks).where(eq(tasks.id, completion.taskId)))[0];
+        const taskName = task?.title || 'المهمة';
+        const rewardAmount = Number(completion.reward) || 0;
+
+        // Atomically process transaction and credit user's wallet
+        await WalletService.processTransactionWithTx(
+          tx,
+          completion.userId,
+          rewardAmount,
+          'TASK_REWARD',
+          'COMPLETED',
+          `مكافأة إنجاز مهمة: ${taskName}`,
+          adminId
+        );
+
+        // Update completion status
+        await tx.update(taskCompletions).set({
+          status: 'COMPLETED',
+          reviewedAt: new Date(),
+          reviewedBy: adminId || null,
+        }).where(eq(taskCompletions.id, id));
+
+        // Notify user
+        await tx.insert(notifications).values({
+          id: uuidv4(),
+          userId: completion.userId,
+          title: '🎉 تمت الموافقة على إثبات المهمة!',
+          message: `تمت مراجعة إثباتك لمهمة "${taskName}" والموافقة عليها، وتمت إضافة مكافأة بقيمة ${rewardAmount.toFixed(2)} $ إلى محفظتك بنجاح.`,
+          type: 'SUCCESS',
+          read: false,
+          createdAt: new Date(),
+        });
+
+        // Insert Admin Log
+        await tx.insert(adminLogs).values({
+          id: uuidv4(),
+          adminId: adminId || 'admin',
+          action: 'APPROVE_TASK_COMPLETION',
+          details: `Approved task completion ${id} (${taskName}) for user ${completion.userId}, reward: $${rewardAmount}`,
+          createdAt: new Date(),
+        });
+
+        // Send Email notification asynchronously
+        const targetUser = (await tx.select().from(users).where(eq(users.id, completion.userId)))[0];
+        if (targetUser?.email) {
+          EmailService.sendStatusUpdateEmail({
+            userEmail: targetUser.email,
+            userName: targetUser.displayName || targetUser.username,
+            requestType: 'TASK',
+            status: 'APPROVED',
+            amount: rewardAmount,
+            reference: taskName,
+            date: new Date(),
+          }).catch(err => console.error('[Email] Failed to send task approval email:', err));
+        }
+      });
+
+      return res.json({ 
+        success: true,
+        message: 'تمت الموافقة على إثبات المهمة وصرف المكافأة بنجاح إلى محفظة المستخدم' 
+      });
+    } catch (error: any) {
+      if (error.message === 'العملية تمت معالجتها مسبقاً' || error.message === 'إنجاز المهمة غير موجود') {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  },
+
+  async rejectSubmission(req: any, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const { reason } = req.body || {};
+      const adminId = req.user?.id;
+      const rejectReason = reason && String(reason).trim().length > 0 
+        ? String(reason).trim() 
+        : 'إثبات غير مكتمل أو لقطة الشاشة غير مطابقة لشروط المهمة';
 
       await db.transaction(async (tx) => {
         const completion = (await tx.select().from(taskCompletions).where(eq(taskCompletions.id, id)))[0];
@@ -309,96 +414,68 @@ export const taskController = {
         const task = (await tx.select().from(tasks).where(eq(tasks.id, completion.taskId)))[0];
         const taskName = task?.title || 'المهمة';
 
-        if (action !== 'REJECT') {
-          // Approve & Pay Reward
-          await WalletService.processTransactionWithTx(
-            tx,
-            completion.userId,
-            Number(completion.reward) || 0,
-            'TASK_REWARD',
-            'COMPLETED',
-            `مكافأة إنجاز مهمة: ${taskName}`,
-            req.user.id
-          );
+        // Update status to REJECTED
+        await tx.update(taskCompletions).set({
+          status: 'REJECTED',
+          rejectionReason: rejectReason,
+          reviewedAt: new Date(),
+          reviewedBy: adminId || null,
+        }).where(eq(taskCompletions.id, id));
 
-          await tx.update(taskCompletions).set({
-            status: 'COMPLETED',
-          }).where(eq(taskCompletions.id, id));
-
-          await tx.insert(notifications).values({
-            id: uuidv4(),
-            userId: completion.userId,
-            title: '🎉 تمت الموافقة على إثبات المهمة!',
-            message: `تم اعتماد إثباتك لمهمة "${taskName}" وإضافة المكافأة بقيمة ${Number(completion.reward).toFixed(2)} $ إلى محفظتك.`,
-            type: 'SUCCESS',
-            read: false,
-            createdAt: new Date(),
-          });
-
-          // Send Email notification asynchronously
-          const targetUser = (await tx.select().from(users).where(eq(users.id, completion.userId)))[0];
-          if (targetUser?.email) {
-            EmailService.sendStatusUpdateEmail({
-              userEmail: targetUser.email,
-              userName: targetUser.displayName || targetUser.username,
-              requestType: 'TASK',
-              status: 'APPROVED',
-              amount: completion.reward,
-              reference: taskName,
-              date: new Date(),
-            }).catch(err => console.error('[Email] Failed to send task approval email:', err));
-          }
-        } else {
-          // Reject with reason
-          const rejectReason = reason ? String(reason).trim() : 'إثبات غير مكتمل أو غير مطابق للشروط';
-          await tx.update(taskCompletions).set({
-            status: 'REJECTED',
-            rejectionReason: rejectReason,
-          }).where(eq(taskCompletions.id, id));
-
-          await tx.insert(notifications).values({
-            id: uuidv4(),
-            userId: completion.userId,
-            title: '❌ تم رفض إثبات المهمة',
-            message: `تم رفض إثبات تنفيذ مهمة "${taskName}". السبب: ${rejectReason}. يمكنك إعادة تنفيذ المهمة وإرسال إثبات صحيح.`,
-            type: 'WARNING',
-            read: false,
-            createdAt: new Date(),
-          });
-
-          // Send Email notification asynchronously
-          const targetUser = (await tx.select().from(users).where(eq(users.id, completion.userId)))[0];
-          if (targetUser?.email) {
-            EmailService.sendStatusUpdateEmail({
-              userEmail: targetUser.email,
-              userName: targetUser.displayName || targetUser.username,
-              requestType: 'TASK',
-              status: 'REJECTED',
-              amount: completion.reward,
-              reference: taskName,
-              reason: rejectReason,
-              date: new Date(),
-            }).catch(err => console.error('[Email] Failed to send task rejection email:', err));
-          }
-        }
-
-        await tx.insert(adminLogs).values({
+        // Notify user
+        await tx.insert(notifications).values({
           id: uuidv4(),
-          adminId: req.user.id,
-          action: action === 'REJECT' ? 'REJECT_TASK_COMPLETION' : 'APPROVE_TASK_COMPLETION',
-          details: `Processed task completion ${id} (${taskName}) with status ${action === 'REJECT' ? 'REJECTED' : 'COMPLETED'}`,
+          userId: completion.userId,
+          title: '❌ تم رفض إثبات المهمة',
+          message: `تم رفض إثبات تنفيذ مهمة "${taskName}". السبب: ${rejectReason}. يمكنك إعادة إنجاز المهمة وإرسال إثبات صحيح.`,
+          type: 'WARNING',
+          read: false,
           createdAt: new Date(),
         });
+
+        // Log Admin Action
+        await tx.insert(adminLogs).values({
+          id: uuidv4(),
+          adminId: adminId || 'admin',
+          action: 'REJECT_TASK_COMPLETION',
+          details: `Rejected task completion ${id} (${taskName}) for user ${completion.userId}. Reason: ${rejectReason}`,
+          createdAt: new Date(),
+        });
+
+        // Send Email notification asynchronously
+        const targetUser = (await tx.select().from(users).where(eq(users.id, completion.userId)))[0];
+        if (targetUser?.email) {
+          EmailService.sendStatusUpdateEmail({
+            userEmail: targetUser.email,
+            userName: targetUser.displayName || targetUser.username,
+            requestType: 'TASK',
+            status: 'REJECTED',
+            amount: completion.reward,
+            reference: taskName,
+            reason: rejectReason,
+            date: new Date(),
+          }).catch(err => console.error('[Email] Failed to send task rejection email:', err));
+        }
       });
 
       return res.json({ 
-        message: action === 'REJECT' ? 'تم رفض إنجاز المهمة وإشعار المستخدم' : 'تمت الموافقة على المهمة وصرف المكافأة بنجاح' 
+        success: true,
+        message: 'تم رفض إنجاز المهمة وحفظ سبب الرفض وإشعار المستخدم' 
       });
     } catch (error: any) {
-       if (error.message === 'العملية تمت معالجتها مسبقاً' || error.message === 'إنجاز المهمة غير موجود') {
+      if (error.message === 'العملية تمت معالجتها مسبقاً' || error.message === 'إنجاز المهمة غير موجود') {
         return res.status(400).json({ error: error.message });
       }
       next(error);
+    }
+  },
+
+  async approveCompletion(req: any, res: Response, next: NextFunction) {
+    const { action, reason } = req.body || {};
+    if (action === 'REJECT') {
+      return taskController.rejectSubmission(req, res, next);
+    } else {
+      return taskController.approveSubmission(req, res, next);
     }
   }
 };

@@ -515,8 +515,29 @@ export const api = {
       const res = await fetchWithAuth(`${API_BASE}/admin/${endpoint}`);
       return handleResponse(res);
     },
+    async getTaskSubmissions(status?: string) {
+      const url = status ? `${API_BASE}/admin/task-submissions?status=${status}` : `${API_BASE}/admin/task-submissions`;
+      const res = await fetchWithAuth(url);
+      return handleResponse(res);
+    },
     async getCompletionProof(id: string) {
       const res = await fetchWithAuth(`${API_BASE}/admin/task-completions/${id}/proof`);
+      return handleResponse(res);
+    },
+    async approveTaskSubmission(id: string) {
+      const res = await fetchWithAuth(`${API_BASE}/admin/task-submissions/${id}/approve`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ action: "APPROVE" }) 
+      });
+      return handleResponse(res);
+    },
+    async rejectTaskSubmission(id: string, reason: string) {
+      const res = await fetchWithAuth(`${API_BASE}/admin/task-submissions/${id}/reject`, { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ action: "REJECT", reason }) 
+      });
       return handleResponse(res);
     },
     async approveCompletion(type: 'AD' | 'TASK', id: string, action: string, reason?: string) {

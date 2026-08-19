@@ -64,22 +64,30 @@ export default function TasksPage() {
   };
 
   // Check completion status of task
-  const getTaskStatus = (taskId: string) => {
+  const getTaskCompletionInfo = (taskId: string) => {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
     const userComps = completions.filter((c: any) => (c.taskId === taskId || c.id === taskId));
     const pendingComp = userComps.find((c: any) => c.status === 'PENDING');
-    if (pendingComp) return 'PENDING';
+    if (pendingComp) return { status: 'PENDING', completion: pendingComp };
 
-    const completedToday = userComps.some((c: any) => {
+    const completedToday = userComps.find((c: any) => {
       if (c.status !== 'COMPLETED') return false;
       const completedDate = new Date(c.completedAt || c.createdAt);
       return completedDate >= todayStart;
     });
 
-    if (completedToday) return 'COMPLETED';
-    return 'AVAILABLE';
+    if (completedToday) return { status: 'COMPLETED', completion: completedToday };
+
+    const rejectedComp = userComps.find((c: any) => c.status === 'REJECTED');
+    if (rejectedComp) return { status: 'REJECTED', completion: rejectedComp };
+
+    return { status: 'AVAILABLE', completion: null };
+  };
+
+  const getTaskStatus = (taskId: string) => {
+    return getTaskCompletionInfo(taskId).status;
   };
 
   const todayCompletedCount = completions.filter((c: any) => {
@@ -251,7 +259,7 @@ export default function TasksPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {tasks.map((task) => {
           const taskId = (task as any).taskId || (task as any).id;
-          const status = getTaskStatus(taskId);
+          const { status, completion } = getTaskCompletionInfo(taskId);
           const isVipEligible = currentVip >= task.requiredVipLevel;
 
           return (
@@ -264,14 +272,16 @@ export default function TasksPage() {
                   ? "bg-emerald-950/10 border-emerald-500/30 opacity-90 shadow-sm" 
                   : status === 'PENDING'
                     ? "bg-yellow-950/10 border-yellow-500/30 shadow-md"
-                    : isVipEligible 
-                      ? "bg-neutral-900/60 border-neutral-800 hover:border-yellow-500/40 shadow-md" 
-                      : "bg-neutral-950/60 border-neutral-800/60 opacity-60 grayscale-[40%]"
+                    : status === 'REJECTED'
+                      ? "bg-red-950/10 border-red-500/30 shadow-md"
+                      : isVipEligible 
+                        ? "bg-neutral-900/60 border-neutral-800 hover:border-yellow-500/40 shadow-md" 
+                        : "bg-neutral-950/60 border-neutral-800/60 opacity-60 grayscale-[40%]"
               )}
             >
               <div className="p-5 pb-3">
                 <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {task.requiredVipLevel > 0 ? (
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
                         مستوى VIP {task.requiredVipLevel}
@@ -304,6 +314,12 @@ export default function TasksPage() {
                       <Clock className="w-3.5 h-3.5" /> قيد مراجعة الإدارة
                     </span>
                   )}
+
+                  {status === 'REJECTED' && (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                      <X className="w-3.5 h-3.5" /> تم رفض الإثبات
+                    </span>
+                  )}
                 </div>
 
                 <h3 className="font-bold text-lg text-white mb-2 line-clamp-1 group-hover:text-yellow-400 transition-colors">
@@ -318,6 +334,16 @@ export default function TasksPage() {
                   <div className="bg-neutral-950/80 border border-neutral-800/80 rounded-lg p-2.5 text-[11px] text-neutral-300 flex items-start gap-2 mb-2">
                     <HelpCircle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
                     <span className="line-clamp-2 leading-relaxed">{task.proofInstructions}</span>
+                  </div>
+                )}
+
+                {status === 'REJECTED' && completion?.rejectionReason && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2.5 text-[11px] text-red-300 flex items-start gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block text-red-400 mb-0.5">سبب الرفض:</span>
+                      <span>{completion.rejectionReason}</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -368,7 +394,12 @@ export default function TasksPage() {
                     onClick={() => handleOpenTaskAction(task)}
                     isLoading={submittingDirectId === taskId}
                   >
-                    {task.taskType === 'PROOF_REQUIRED' ? (
+                    {status === 'REJECTED' ? (
+                      <>
+                        <Upload className="w-4 h-4 ml-2" />
+                        إعادة رفع إثبات جديد ({formatCurrency(task.reward)})
+                      </>
+                    ) : task.taskType === 'PROOF_REQUIRED' ? (
                       <>
                         <Upload className="w-4 h-4 ml-2" />
                         تنفيذ وإرسال الإثبات ({formatCurrency(task.reward)})

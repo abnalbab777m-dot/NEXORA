@@ -100,6 +100,8 @@ export const taskCompletions = pgTable("task_completions", {
   proofAccount: text("proof_account"), // username / account ID used by member
   rejectionReason: text("rejection_reason"),
   completedAt: timestamp("completed_at").$defaultFn(() => new Date()).notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: text("reviewed_by").references(() => users.id),
 });
 
 export const ads = pgTable("ads", {

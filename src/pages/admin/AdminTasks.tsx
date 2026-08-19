@@ -82,8 +82,8 @@ export default function AdminTasks() {
     try {
       const snap = await api.admin.getAdminTasks();
       setTasks(snap.tasks || []);
-      const compSnap = await api.admin.getAdminCompletions('TASK');
-      setCompletions(compSnap.completions || []);
+      const compSnap = await api.admin.getTaskSubmissions();
+      setCompletions(compSnap.submissions || compSnap.completions || []);
     } catch (err: any) {
       setError(err.message);
       toast.error('فشل في جلب البيانات', err.message);
@@ -205,8 +205,13 @@ export default function AdminTasks() {
   const handleAction = async (completionId: string, action: 'APPROVE' | 'REJECT', reason?: string) => {
     setIsProcessingAction(true);
     try {
-      await api.admin.approveCompletion('TASK', completionId, action, reason);
-      toast.success(action === 'APPROVE' ? 'تم اعتماد المكافأة وصرف الرصيد للمستخدم بنجاح' : 'تم رفض إنجاز المهمة وإشعار المستخدم');
+      if (action === 'APPROVE') {
+        await api.admin.approveTaskSubmission(completionId);
+        toast.success('تم اعتماد المكافأة وصرف الرصيد للمستخدم بنجاح');
+      } else {
+        await api.admin.rejectTaskSubmission(completionId, reason || 'إثبات غير مطابق للشروط');
+        toast.success('تم رفض إنجاز المهمة وإشعار المستخدم');
+      }
       setReviewingCompletion(null);
       setRejectionReason('');
       fetchData();

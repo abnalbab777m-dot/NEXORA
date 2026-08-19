@@ -31,9 +31,15 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // Prevent browser caching on all API requests
+  headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  headers.set('Pragma', 'no-cache');
+  headers.set('Expires', '0');
+
   try {
     const res = await fetch(url, {
       credentials: 'include',
+      cache: 'no-store',
       ...options,
       headers,
     });

@@ -11,8 +11,60 @@ import { paymentMethodController } from './controllers/payment-method.controller
 
 import { requireAuth, requireAdmin } from './middlewares/auth.middleware';
 import { validate } from './middlewares/validate.middleware';
+import { db } from '../src/db/index.ts';
+import { deposits, transactions, withdrawals } from '../src/db/schema.ts';
+import { desc } from 'drizzle-orm';
 
 const router = Router();
+
+// --- Live DB Debug Endpoint ---
+router.get('/debug/db-status', async (req, res) => {
+  try {
+    const rawDeposits = await db.select({
+      id: deposits.id,
+      userId: deposits.userId,
+      amount: deposits.amount,
+      status: deposits.status,
+      reference: deposits.reference,
+      createdAt: deposits.createdAt,
+      updatedAt: deposits.updatedAt,
+    }).from(deposits).orderBy(desc(deposits.createdAt)).limit(50);
+
+    const rawTransactions = await db.select({
+      id: transactions.id,
+      userId: transactions.userId,
+      type: transactions.type,
+      amount: transactions.amount,
+      status: transactions.status,
+      description: transactions.description,
+      createdAt: transactions.createdAt,
+      processedAt: transactions.processedAt,
+    }).from(transactions).orderBy(desc(transactions.createdAt)).limit(50);
+
+    const rawWithdrawals = await db.select({
+      id: withdrawals.id,
+      userId: withdrawals.userId,
+      amount: withdrawals.amount,
+      status: withdrawals.status,
+      reference: withdrawals.reference,
+      createdAt: withdrawals.createdAt,
+      updatedAt: withdrawals.updatedAt,
+    }).from(withdrawals).orderBy(desc(withdrawals.createdAt)).limit(50);
+
+    return res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      depositsCount: rawDeposits.length,
+      transactionsCount: rawTransactions.length,
+      withdrawalsCount: rawWithdrawals.length,
+      deposits: rawDeposits,
+      transactions: rawTransactions,
+      withdrawals: rawWithdrawals,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 // --- Auth Routes ---
 router.post('/auth/register', validate(registerSchema), authController.register);

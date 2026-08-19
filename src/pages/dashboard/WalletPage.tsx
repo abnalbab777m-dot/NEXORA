@@ -26,7 +26,8 @@ import {
   Filter,
   CheckCheck,
   ChevronDown,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { formatCurrency, cn } from '../../lib/utils';
@@ -43,6 +44,7 @@ export default function WalletPage() {
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTx, setLoadingTx] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorTx, setErrorTx] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'deposit' | 'withdraw'>('overview');
   const [filterType, setFilterType] = useState<string>('ALL');
@@ -71,6 +73,13 @@ export default function WalletPage() {
     refreshWallet();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      fetchTransactions();
+      refreshWallet();
+    }
+  }, [activeTab]);
+
   const fetchPaymentMethods = async () => {
     setLoadingMethods(true);
     try {
@@ -96,8 +105,9 @@ export default function WalletPage() {
     }
   };
 
-  const fetchTransactions = async () => {
-    setLoadingTx(true);
+  const fetchTransactions = async (isManual = false) => {
+    if (isManual) setIsRefreshing(true);
+    else setLoadingTx(true);
     setErrorTx(null);
     try {
       const data = await api.getTransactions();
@@ -106,6 +116,7 @@ export default function WalletPage() {
       setErrorTx(err.message || 'فشل في تحميل سجل العمليات');
     } finally {
       setLoadingTx(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -559,44 +570,60 @@ export default function WalletPage() {
                 <CardTitle className="text-lg text-white">سجل العمليات المالية والتحويلات</CardTitle>
               </div>
 
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1.5 bg-neutral-950 p-1 rounded-xl border border-neutral-800 text-xs">
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setFilterType('ALL')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg font-medium transition-colors",
-                    filterType === 'ALL' ? "bg-neutral-800 text-white font-bold" : "text-neutral-400 hover:text-white"
-                  )}
+                  id="btn-refresh-txs"
+                  onClick={() => {
+                    fetchTransactions(true);
+                    refreshWallet();
+                  }}
+                  disabled={isRefreshing || loadingTx}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-800 bg-neutral-950 text-neutral-400 hover:text-yellow-400 hover:border-neutral-700 text-xs font-medium transition-all disabled:opacity-50"
+                  title="تحديث فوري للسجل"
                 >
-                  الكل
+                  <RefreshCw className={cn("w-3.5 h-3.5", (isRefreshing || loadingTx) && "animate-spin text-yellow-500")} />
+                  <span>تحديث</span>
                 </button>
-                <button
-                  onClick={() => setFilterType('DEPOSITS')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg font-medium transition-colors",
-                    filterType === 'DEPOSITS' ? "bg-neutral-800 text-emerald-400 font-bold" : "text-neutral-400 hover:text-white"
-                  )}
-                >
-                  الإيداعات
-                </button>
-                <button
-                  onClick={() => setFilterType('WITHDRAWALS')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg font-medium transition-colors",
-                    filterType === 'WITHDRAWALS' ? "bg-neutral-800 text-amber-400 font-bold" : "text-neutral-400 hover:text-white"
-                  )}
-                >
-                  السحوبات
-                </button>
-                <button
-                  onClick={() => setFilterType('EARNINGS')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg font-medium transition-colors",
-                    filterType === 'EARNINGS' ? "bg-neutral-800 text-yellow-400 font-bold" : "text-neutral-400 hover:text-white"
-                  )}
-                >
-                  الأرباح
-                </button>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 bg-neutral-950 p-1 rounded-xl border border-neutral-800 text-xs">
+                  <button
+                    onClick={() => setFilterType('ALL')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-medium transition-colors",
+                      filterType === 'ALL' ? "bg-neutral-800 text-white font-bold" : "text-neutral-400 hover:text-white"
+                    )}
+                  >
+                    الكل
+                  </button>
+                  <button
+                    onClick={() => setFilterType('DEPOSITS')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-medium transition-colors",
+                      filterType === 'DEPOSITS' ? "bg-neutral-800 text-emerald-400 font-bold" : "text-neutral-400 hover:text-white"
+                    )}
+                  >
+                    الإيداعات
+                  </button>
+                  <button
+                    onClick={() => setFilterType('WITHDRAWALS')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-medium transition-colors",
+                      filterType === 'WITHDRAWALS' ? "bg-neutral-800 text-amber-400 font-bold" : "text-neutral-400 hover:text-white"
+                    )}
+                  >
+                    السحوبات
+                  </button>
+                  <button
+                    onClick={() => setFilterType('EARNINGS')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-medium transition-colors",
+                      filterType === 'EARNINGS' ? "bg-neutral-800 text-yellow-400 font-bold" : "text-neutral-400 hover:text-white"
+                    )}
+                  >
+                    الأرباح
+                  </button>
+                </div>
               </div>
             </CardHeader>
 

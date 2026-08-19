@@ -229,8 +229,8 @@ export async function runDatabaseSeed() {
             category: 'TELEGRAM',
             taskType: 'PROOF_REQUIRED',
             proofInstructions: 'قم بالانضمام للقناة ثم أرسل اسم المستخدم الخاص بك على تيليجرام (مثل: @username) مع لقطة شاشة توضح عضويتك في القناة.',
-            requiredVipLevel: 0,
-            status: 'ACTIVE',
+            requiredVipLevel: 1,
+            status: 'INACTIVE',
           },
           {
             id: uuidv4(),
@@ -308,8 +308,8 @@ export async function runDatabaseSeed() {
             reward: 1.5,
             durationSeconds: 15,
             url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-            requiredVipLevel: 0,
-            status: 'ACTIVE',
+            requiredVipLevel: 1,
+            status: 'INACTIVE',
           },
           {
             id: uuidv4(),

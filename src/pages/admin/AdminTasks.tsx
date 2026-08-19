@@ -82,7 +82,7 @@ export default function AdminTasks() {
       taskType: 'PROOF_REQUIRED',
       proofInstructions: 'قم بالانضمام للقناة ثم أرسل اسم المستخدم الخاص بك أو لقطة شاشة توضح اشتراكك.',
       durationSeconds: 30,
-      requiredVipLevel: 0,
+      requiredVipLevel: 1,
       status: 'ACTIVE'
     });
   };
@@ -769,7 +769,6 @@ export default function AdminTasks() {
                       onChange={e => setEditingTask({...editingTask, requiredVipLevel: Number(e.target.value)})}
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-sm text-neutral-200 focus:outline-none focus:border-yellow-500/50"
                     >
-                      <option value={0}>VIP 0 (جميع المستخدمين مجاناً)</option>
                       <option value={1}>VIP 1 (باقة 30$ فما فوق)</option>
                       <option value={2}>VIP 2 (باقة 50$ فما فوق)</option>
                       <option value={3}>VIP 3 (باقة 100$ فما فوق)</option>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -29,7 +30,25 @@ import { api } from '../../lib/api';
 
 export default function AdminAds() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<'ADS' | 'COMPLETIONS'>('ADS');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'ADS' | 'COMPLETIONS'>(
+    tabParam === 'COMPLETIONS' ? 'COMPLETIONS' : 'ADS'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'COMPLETIONS' && activeTab !== 'COMPLETIONS') {
+      setActiveTab('COMPLETIONS');
+    } else if (tabParam !== 'COMPLETIONS' && activeTab !== 'ADS') {
+      setActiveTab('ADS');
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: 'ADS' | 'COMPLETIONS') => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
   const [ads, setAds] = useState<Ad[]>([]);
   const [completions, setCompletions] = useState<AdCompletion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,7 +223,7 @@ export default function AdminAds() {
       {/* Tabs */}
       <div className="flex border-b border-neutral-800">
         <button
-          onClick={() => setActiveTab('ADS')}
+          onClick={() => handleTabChange('ADS')}
           className={`pb-3 px-4 text-sm font-semibold transition-colors relative ${
             activeTab === 'ADS' 
               ? 'text-yellow-500 border-b-2 border-yellow-500' 
@@ -215,7 +234,7 @@ export default function AdminAds() {
         </button>
 
         <button
-          onClick={() => setActiveTab('COMPLETIONS')}
+          onClick={() => handleTabChange('COMPLETIONS')}
           className={`pb-3 px-4 text-sm font-semibold transition-colors relative flex items-center gap-2 ${
             activeTab === 'COMPLETIONS' 
               ? 'text-yellow-500 border-b-2 border-yellow-500' 

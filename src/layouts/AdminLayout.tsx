@@ -1,4 +1,4 @@
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
@@ -26,13 +26,16 @@ const navItems = [
   { to: '/admin/users', icon: Users, label: 'المستخدمين والأرصدة' },
   { to: '/admin/settings', icon: Settings, label: 'إعدادات النظام' },
   { to: '/admin/vip', icon: Star, label: 'باقات VIP' },
-  { to: '/admin/tasks', icon: CheckSquare, label: 'المهام' },
-  { to: '/admin/ads', icon: PlaySquare, label: 'الإعلانات' },
+  { to: '/admin/tasks', icon: CheckSquare, label: 'إدارة المهام', end: true },
+  { to: '/admin/tasks?tab=COMPLETIONS', icon: CheckSquare, label: 'مراجعة المهام' },
+  { to: '/admin/ads', icon: PlaySquare, label: 'إدارة الإعلانات', end: true },
+  { to: '/admin/ads?tab=COMPLETIONS', icon: PlaySquare, label: 'مراجعة الإعلانات' },
 ];
 
 export default function AdminLayout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     await logout();
@@ -63,12 +66,14 @@ export default function AdminLayout() {
 
           <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-2 px-4">أقسام الإدارة</div>
           
-          {navItems.map((item) => (
-            <NavLink
+          {navItems.map((item) => {
+            const currentPath = location.pathname + location.search;
+            const isActive = item.to === '/admin' ? currentPath === '/admin' : currentPath === item.to;
+            return (
+            <Link
               key={item.to}
               to={item.to}
-              end={item.end}
-              className={({ isActive }) => cn(
+              className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-xl transition-colors',
                 isActive 
                   ? 'bg-red-500/10 text-red-400 font-medium' 
@@ -77,8 +82,8 @@ export default function AdminLayout() {
             >
               <item.icon className="w-5 h-5" />
               {item.label}
-            </NavLink>
-          ))}
+            </Link>
+          )})}
         </nav>
 
         <div className="p-4 border-t border-neutral-800">
@@ -107,20 +112,22 @@ export default function AdminLayout() {
         
         {/* Mobile Nav */}
         <nav className="md:hidden flex items-center justify-around p-3 border-t border-neutral-800 bg-neutral-900/80 backdrop-blur-md pb-safe">
-          {navItems.slice(0, 4).map((item) => (
-            <NavLink
+          {navItems.slice(0, 4).map((item) => {
+            const currentPath = location.pathname + location.search;
+            const isActive = item.to === '/admin' ? currentPath === '/admin' : currentPath.startsWith(item.to);
+            return (
+            <Link
               key={item.to}
               to={item.to}
-              end={item.end}
-              className={({ isActive }) => cn(
+              className={cn(
                 'flex flex-col items-center gap-1 p-2 rounded-lg transition-colors',
                 isActive ? 'text-red-500' : 'text-neutral-500'
               )}
             >
               <item.icon className="w-5 h-5" />
               <span className="text-[10px] whitespace-nowrap">{item.label}</span>
-            </NavLink>
-          ))}
+            </Link>
+          )})}
           <Button variant="ghost" size="sm" className="flex flex-col items-center gap-1 p-1 h-auto hover:bg-transparent rounded-lg text-neutral-500" onClick={handleLogout}>
             <LogOut className="w-5 h-5" />
             <span className="text-[10px]">خروج</span>

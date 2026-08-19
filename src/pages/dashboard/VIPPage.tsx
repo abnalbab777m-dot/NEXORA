@@ -236,7 +236,8 @@ export default function VIPPage() {
             </div>
 
             <Link
-              to="/dashboard/deposit"
+              to="/dashboard/wallet"
+              state={{ tab: 'deposit' }}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold border border-neutral-700 transition"
             >
               <span>شحن الرصيد</span>
@@ -488,7 +489,7 @@ export default function VIPPage() {
                   >
                     إلغاء
                   </Button>
-                  <Link to="/dashboard/deposit" className="w-full">
+                  <Link to="/dashboard/wallet" state={{ tab: 'deposit' }} className="w-full">
                     <Button 
                       variant="primary" 
                       className="w-full text-xs bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold"

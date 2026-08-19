@@ -515,6 +515,10 @@ export const api = {
       const res = await fetchWithAuth(`${API_BASE}/admin/${endpoint}`);
       return handleResponse(res);
     },
+    async getCompletionProof(id: string) {
+      const res = await fetchWithAuth(`${API_BASE}/admin/task-completions/${id}/proof`);
+      return handleResponse(res);
+    },
     async approveCompletion(type: 'AD' | 'TASK', id: string, action: string, reason?: string) {
       const res = await fetchWithAuth(`${API_BASE}/admin/${type === "AD" ? "ad-completions" : "task-completions"}/${id}/approve`, { 
         method: "POST", 

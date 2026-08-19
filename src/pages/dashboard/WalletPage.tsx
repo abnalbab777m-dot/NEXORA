@@ -36,17 +36,21 @@ import { useWallet } from '../../context/WalletContext';
 import { useToast } from '../../components/ui/Toast';
 import { PaymentMethod } from '../../types/models';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLocation } from 'react-router-dom';
 
 export default function WalletPage() {
   const { user } = useAuth();
   const { wallet, refreshWallet } = useWallet();
   const toast = useToast();
+  const location = useLocation();
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTx, setLoadingTx] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorTx, setErrorTx] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'deposit' | 'withdraw'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'deposit' | 'withdraw'>(
+    location.state?.tab || 'overview'
+  );
   const [filterType, setFilterType] = useState<string>('ALL');
 
   // Dynamic Payment Methods State

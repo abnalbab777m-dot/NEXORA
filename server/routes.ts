@@ -144,6 +144,7 @@ router.post('/admin/tasks', taskController.createTask);
 router.patch('/admin/tasks/:id', taskController.updateTask);
 router.delete('/admin/tasks/:id', taskController.deleteTask);
 router.get('/admin/task-completions', taskController.getAdminCompletions);
+router.get('/admin/task-completions/:id/proof', taskController.getCompletionProof);
 router.post('/admin/task-completions/:id/approve', taskController.approveCompletion);
 
 router.get('/admin/ads', adController.getAdminAds);

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../../src/db/index.ts';
 import { tasks, taskCompletions, users, adminLogs, notifications } from '../../src/db/schema.ts';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { WalletService } from '../services/wallet.service';
 import { EmailService } from '../services/email.service';
@@ -265,7 +265,7 @@ export const taskController = {
           userId: taskCompletions.userId,
           reward: taskCompletions.reward,
           status: taskCompletions.status,
-          proofImage: taskCompletions.proofImage,
+          proofImage: sql<string | null>`CASE WHEN ${taskCompletions.proofImage} IS NOT NULL THEN 'AVAILABLE' ELSE NULL END`,
           proofAccount: taskCompletions.proofAccount,
           rejectionReason: taskCompletions.rejectionReason,
           completedAt: taskCompletions.completedAt,
@@ -280,6 +280,17 @@ export const taskController = {
         .orderBy(desc(taskCompletions.completedAt));
 
       return res.json({ completions: allCompletions });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getCompletionProof(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const completion = (await db.select({ proofImage: taskCompletions.proofImage }).from(taskCompletions).where(eq(taskCompletions.id, id)))[0];
+      if (!completion) return res.status(404).json({ error: 'Not found' });
+      return res.json({ proofImage: completion.proofImage });
     } catch (error) {
       next(error);
     }

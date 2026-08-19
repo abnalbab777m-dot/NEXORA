@@ -258,45 +258,28 @@ export default function WalletPage() {
   const withdrawMethods = paymentMethods.filter(m => (m.type === 'WITHDRAWAL' || m.type === 'BOTH') && m.isActive);
 
   // Transaction Status Helpers
-  const getStatusBadge = (status: string) => {
+  const renderStatusBadge = (status: string) => {
     const s = String(status || '').toLowerCase().trim();
-    
-    // Rejected / Failed / Cancelled / Declined / مرفوض
-    if (
-      s.includes('reject') || 
-      s.includes('fail') || 
-      s.includes('cancel') || 
-      s.includes('decline') || 
-      s.includes('مرفوض') ||
-      s.includes('ملغي')
-    ) {
+    if (['rejected', 'cancelled', 'failed', 'مرفوض'].includes(s)) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-          <XCircle className="w-3.5 h-3.5" /> مرفوض
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+          مرفوض
         </span>
       );
     }
-
-    // Completed / Approved / Success / مكتمل
-    if (
-      s.includes('complete') || 
-      s.includes('approved') || 
-      s.includes('success') || 
-      s.includes('مكتمل') || 
-      s.includes('موافق') ||
-      s.includes('مؤكد')
-    ) {
+    if (['completed', 'approved', 'success', 'مكتمل'].includes(s)) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <CheckCircle2 className="w-3.5 h-3.5" /> مكتمل
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          مكتمل
         </span>
       );
     }
-    
-    // Default Pending
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-        <Clock className="w-3.5 h-3.5 animate-pulse" /> قيد المراجعة
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+        قيد المراجعة
       </span>
     );
   };
@@ -304,8 +287,8 @@ export default function WalletPage() {
   const getDynamicDescription = (tx: any) => {
     const s = String(tx.status || '').toLowerCase().trim();
     
-    const isCompleted = s.includes('complete') || s.includes('approved') || s.includes('success') || s.includes('مكتمل') || s.includes('موافق') || s.includes('مؤكد');
-    const isRejected = s.includes('reject') || s.includes('fail') || s.includes('cancel') || s.includes('decline') || s.includes('مرفوض') || s.includes('ملغي');
+    const isCompleted = ['completed', 'approved', 'success', 'مكتمل'].includes(s);
+    const isRejected = ['rejected', 'cancelled', 'failed', 'مرفوض'].includes(s);
 
     // Extract TXID or reference if available
     let refStr = '';
@@ -323,13 +306,13 @@ export default function WalletPage() {
     if (tx.type === 'DEPOSIT') {
       if (isRejected) return `تم رفض الإيداع${refStr}`;
       if (isCompleted) return `إيداع مؤكد${refStr}`;
-      return `طلب إيداع قيد المراجعة${refStr}`;
+      return `طلب إيداع${refStr}`;
     }
 
     if (tx.type === 'WITHDRAWAL') {
       if (isRejected) return `تم رفض السحب${refStr}`;
       if (isCompleted) return `سحب مؤكد${refStr}`;
-      return `طلب سحب قيد المراجعة${refStr}`;
+      return `طلب سحب${refStr}`;
     }
 
     return tx.description || `عملية ${tx.type}`;
@@ -661,7 +644,7 @@ export default function WalletPage() {
                           <div>
                             <div className="flex items-center gap-2">
                               <h4 className="font-bold text-white text-sm">{typeInfo.title}</h4>
-                              <span className="sm:hidden">{getStatusBadge(tx.status)}</span>
+                              <span className="sm:hidden">{renderStatusBadge(tx.status)}</span>
                             </div>
                             <p className="text-xs text-neutral-400 mt-0.5 max-w-md line-clamp-1">
                               {getDynamicDescription(tx)}
@@ -681,7 +664,7 @@ export default function WalletPage() {
                             {isPositive ? '+' : '-'}{formatCurrency(tx.amount)}
                           </span>
                           <div className="hidden sm:block mt-1.5">
-                            {getStatusBadge(tx.status)}
+                            {renderStatusBadge(tx.status)}
                           </div>
                         </div>
                       </div>

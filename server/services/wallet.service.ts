@@ -96,14 +96,30 @@ export class WalletService {
       // 4. Create or Update Ledger Record
       const txIdToUse = existingTxId || txId;
       if (existingTxId) {
-        await tx.update(transactions).set({
-          status: status as any,
-          description: description || null,
-          balanceBefore: currentAvailable,
-          balanceAfter: newAvailable,
-          processedBy: adminId || null,
-          processedAt: (status === 'APPROVED' || status === 'COMPLETED' || status === 'REJECTED') ? new Date() : null,
-        }).where(eq(transactions.id, existingTxId));
+        const found = (await tx.select().from(transactions).where(eq(transactions.id, existingTxId)))[0];
+        if (found) {
+          await tx.update(transactions).set({
+            status: status as any,
+            description: description || null,
+            balanceBefore: currentAvailable,
+            balanceAfter: newAvailable,
+            processedBy: adminId || null,
+            processedAt: (status === 'APPROVED' || status === 'COMPLETED' || status === 'REJECTED') ? new Date() : null,
+          }).where(eq(transactions.id, existingTxId));
+        } else {
+          await tx.insert(transactions).values({
+            id: existingTxId,
+            userId: userId,
+            type: type as any,
+            amount: amount,
+            status: status as any,
+            description: description || null,
+            balanceBefore: currentAvailable,
+            balanceAfter: newAvailable,
+            processedBy: adminId || null,
+            processedAt: (status === 'APPROVED' || status === 'COMPLETED' || status === 'REJECTED') ? new Date() : null,
+          });
+        }
       } else {
         await tx.insert(transactions).values({
           id: txIdToUse,

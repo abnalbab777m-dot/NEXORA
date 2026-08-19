@@ -250,22 +250,6 @@ export default function WalletPage() {
   const getStatusBadge = (status: string) => {
     const s = String(status || '').toLowerCase().trim();
     
-    // Completed / Approved / Success / مكتمل
-    if (
-      s.includes('complete') || 
-      s.includes('approved') || 
-      s.includes('success') || 
-      s.includes('مكتمل') || 
-      s.includes('موافق') ||
-      s.includes('مؤكد')
-    ) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <CheckCircle2 className="w-3.5 h-3.5" /> مكتمل
-        </span>
-      );
-    }
-    
     // Rejected / Failed / Cancelled / Declined / مرفوض
     if (
       s.includes('reject') || 
@@ -276,15 +260,31 @@ export default function WalletPage() {
       s.includes('ملغي')
     ) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
           <XCircle className="w-3.5 h-3.5" /> مرفوض
+        </span>
+      );
+    }
+
+    // Completed / Approved / Success / مكتمل
+    if (
+      s.includes('complete') || 
+      s.includes('approved') || 
+      s.includes('success') || 
+      s.includes('مكتمل') || 
+      s.includes('موافق') ||
+      s.includes('مؤكد')
+    ) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <CheckCircle2 className="w-3.5 h-3.5" /> مكتمل
         </span>
       );
     }
     
     // Default Pending
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
         <Clock className="w-3.5 h-3.5 animate-pulse" /> قيد المراجعة
       </span>
     );
@@ -292,32 +292,51 @@ export default function WalletPage() {
 
   const getDynamicDescription = (tx: any) => {
     const s = String(tx.status || '').toLowerCase().trim();
-    let baseText = tx.description || `عملية ${tx.type}`;
     
-    const isCompleted = s.includes('complete') || s.includes('approved') || s.includes('success') || s.includes('مكتمل') || s.includes('مؤكد');
-    const isRejected = s.includes('reject') || s.includes('fail') || s.includes('cancel') || s.includes('decline') || s.includes('مرفوض');
+    const isCompleted = s.includes('complete') || s.includes('approved') || s.includes('success') || s.includes('مكتمل') || s.includes('موافق') || s.includes('مؤكد');
+    const isRejected = s.includes('reject') || s.includes('fail') || s.includes('cancel') || s.includes('decline') || s.includes('مرفوض') || s.includes('ملغي');
 
-    if (tx.type === 'DEPOSIT') {
-      if (isCompleted) baseText = "إيداع مؤكد";
-      else if (isRejected) baseText = "طلب إيداع مرفوض";
-      else baseText = "طلب إيداع قيد المراجعة";
-    } else if (tx.type === 'WITHDRAWAL') {
-      if (isCompleted) baseText = "سحب مؤكد";
-      else if (isRejected) baseText = "طلب سحب مرفوض";
-      else baseText = "طلب سحب قيد المراجعة";
-    }
-    
-    // Extract TXID or Hash or wallet reference if it exists in the original description to keep context
+    // Extract TXID or reference if available
+    let refStr = '';
     if (tx.description) {
-      const match = tx.description.match(/\(TXID:[^)]+\)/i) || tx.description.match(/\(Hash:[^)]+\)/i) || tx.description.match(/إلى محفظة:[^)]+/i);
+      const match = tx.description.match(/\((?:TXID|Hash|مرجع|محفظة):?[^)]+\)/i) || tx.description.match(/إلى محفظة:[^)]+/i);
       if (match) {
-        return `${baseText} ${match[0]}`;
+        refStr = ` ${match[0]}`;
       }
     }
-    return baseText;
+    if (!refStr) {
+      const refVal = tx.reference || tx.txHash || (tx.id ? `${String(tx.id).substring(0, 8)}...` : '');
+      if (refVal) refStr = ` (TXID: ${refVal})`;
+    }
+
+    if (tx.type === 'DEPOSIT') {
+      if (isRejected) return `تم رفض الإيداع${refStr}`;
+      if (isCompleted) return `إيداع مؤكد${refStr}`;
+      return `طلب إيداع قيد المراجعة${refStr}`;
+    }
+
+    if (tx.type === 'WITHDRAWAL') {
+      if (isRejected) return `تم رفض السحب${refStr}`;
+      if (isCompleted) return `سحب مؤكد${refStr}`;
+      return `طلب سحب قيد المراجعة${refStr}`;
+    }
+
+    return tx.description || `عملية ${tx.type}`;
   };
 
-  const getTransactionTypeDetails = (type: string) => {
+  const getTransactionTypeDetails = (type: string, status?: string) => {
+    const s = String(status || '').toLowerCase().trim();
+    const isRejected = s.includes('reject') || s.includes('fail') || s.includes('cancel') || s.includes('decline') || s.includes('مرفوض') || s.includes('ملغي');
+
+    if (isRejected) {
+      return {
+        title: type === 'DEPOSIT' ? 'إيداع مرفوض' : type === 'WITHDRAWAL' ? 'سحب مرفوض' : type,
+        icon: <XCircle className="w-4 h-4" />,
+        isPositive: false,
+        color: 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+      };
+    }
+
     switch (type) {
       case 'DEPOSIT':
         return {
@@ -596,8 +615,10 @@ export default function WalletPage() {
                 <div className="space-y-3">
                   {filteredTransactions.map((tx) => {
                     const txId = tx.id || tx.transactionId;
-                    const typeInfo = getTransactionTypeDetails(tx.type);
-                    const isPositive = tx.type === 'DEPOSIT' || tx.type === 'TASK_REWARD' || tx.type === 'AD_REWARD' || (tx.type === 'ADMIN_ADJUSTMENT' && tx.amount > 0);
+                    const typeInfo = getTransactionTypeDetails(tx.type, tx.status);
+                    const s = String(tx.status || '').toLowerCase().trim();
+                    const isRejected = s.includes('reject') || s.includes('fail') || s.includes('cancel') || s.includes('decline') || s.includes('مرفوض');
+                    const isPositive = !isRejected && (tx.type === 'DEPOSIT' || tx.type === 'TASK_REWARD' || tx.type === 'AD_REWARD' || (tx.type === 'ADMIN_ADJUSTMENT' && tx.amount > 0));
 
                     return (
                       <div 
@@ -628,7 +649,7 @@ export default function WalletPage() {
                         <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-neutral-800">
                           <span className={cn(
                             "text-base font-extrabold font-mono",
-                            isPositive ? "text-emerald-400" : "text-amber-400"
+                            isRejected ? "text-neutral-500 line-through" : isPositive ? "text-emerald-400" : "text-amber-400"
                           )}>
                             {isPositive ? '+' : '-'}{formatCurrency(tx.amount)}
                           </span>

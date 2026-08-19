@@ -270,6 +270,20 @@ export const adminController = {
           }).where(eq(transactions.id, existingTxId));
         }
 
+        // Also sweep any pending transaction for this user with same type and amount
+        await tx.update(transactions).set({
+          status: 'APPROVED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(
+          and(
+            eq(transactions.userId, deposit.userId),
+            eq(transactions.type, 'DEPOSIT'),
+            eq(transactions.amount, depositAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        );
+
         // Process wallet transaction securely
         await WalletService.processTransactionWithTx(
           tx,
@@ -359,6 +373,20 @@ export const adminController = {
             processedAt: new Date(),
           }).where(eq(transactions.id, existingTxId));
         }
+
+        // Also sweep any pending transaction for this user with same type and amount
+        await tx.update(transactions).set({
+          status: 'REJECTED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(
+          and(
+            eq(transactions.userId, deposit.userId),
+            eq(transactions.type, 'DEPOSIT'),
+            eq(transactions.amount, depositAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        );
 
         // Process wallet transaction securely (updates ledger to REJECTED)
         await WalletService.processTransactionWithTx(
@@ -450,6 +478,20 @@ export const adminController = {
           }).where(eq(transactions.id, existingTxId));
         }
 
+        // Also sweep any pending transaction for this user with same type and amount
+        await tx.update(transactions).set({
+          status: 'APPROVED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(
+          and(
+            eq(transactions.userId, withdrawal.userId),
+            eq(transactions.type, 'WITHDRAWAL'),
+            eq(transactions.amount, withdrawalAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        );
+
         // Process wallet securely (moves from pending to totalWithdrawals)
         await WalletService.processTransactionWithTx(
           tx,
@@ -540,6 +582,20 @@ export const adminController = {
             processedAt: new Date(),
           }).where(eq(transactions.id, existingTxId));
         }
+
+        // Also sweep any pending transaction for this user with same type and amount
+        await tx.update(transactions).set({
+          status: 'REJECTED',
+          processedBy: req.user.id,
+          processedAt: new Date(),
+        }).where(
+          and(
+            eq(transactions.userId, withdrawal.userId),
+            eq(transactions.type, 'WITHDRAWAL'),
+            eq(transactions.amount, withdrawalAmount),
+            eq(transactions.status, 'PENDING')
+          )
+        );
 
         // Process refund in wallet (REJECTED status automatically adds amount back to available and deducts from pending!)
         await WalletService.processTransactionWithTx(

@@ -80,10 +80,8 @@ export const walletController = {
           // Find matching deposit
           const matchedDeposit = userDeposits.find(d => 
             d.id === tx.id || 
-            (Math.abs(Number(d.amount) - Number(tx.amount)) < 0.001 && (
-              (d.reference && tx.description && tx.description.includes(d.reference)) ||
-              Math.abs(new Date(d.createdAt).getTime() - new Date(tx.createdAt).getTime()) < 180000
-            ))
+            (d.reference && tx.description && tx.description.includes(d.reference)) ||
+            (Math.abs(Number(d.amount) - Number(tx.amount)) < 0.001 && Math.abs(new Date(d.createdAt).getTime() - new Date(tx.createdAt).getTime()) < 86400000)
           );
 
           if (matchedDeposit) {
@@ -106,10 +104,8 @@ export const walletController = {
           // Find matching withdrawal
           const matchedWithdrawal = userWithdrawals.find(w => 
             w.id === tx.id || 
-            (Math.abs(Number(w.amount) - Number(tx.amount)) < 0.001 && (
-              (w.reference && tx.description && tx.description.includes(w.reference)) ||
-              Math.abs(new Date(w.createdAt).getTime() - new Date(tx.createdAt).getTime()) < 180000
-            ))
+            (w.reference && tx.description && tx.description.includes(w.reference)) ||
+            (Math.abs(Number(w.amount) - Number(tx.amount)) < 0.001 && Math.abs(new Date(w.createdAt).getTime() - new Date(tx.createdAt).getTime()) < 86400000)
           );
 
           if (matchedWithdrawal) {
@@ -135,7 +131,10 @@ export const walletController = {
       for (const dep of userDeposits) {
         const existsInTxs = reconciledTxs.some(t => 
           t.id === dep.id || 
-          (t.type === 'DEPOSIT' && Math.abs(Number(t.amount) - Number(dep.amount)) < 0.001 && Math.abs(new Date(t.createdAt).getTime() - new Date(dep.createdAt).getTime()) < 180000)
+          (t.type === 'DEPOSIT' && (
+            (dep.reference && t.description && t.description.includes(dep.reference)) ||
+            (Math.abs(Number(t.amount) - Number(dep.amount)) < 0.001 && Math.abs(new Date(t.createdAt).getTime() - new Date(dep.createdAt).getTime()) < 86400000)
+          ))
         );
         if (!existsInTxs) {
           const depSt = String(dep.status || '').toUpperCase();
@@ -161,7 +160,10 @@ export const walletController = {
       for (const w of userWithdrawals) {
         const existsInTxs = reconciledTxs.some(t => 
           t.id === w.id || 
-          (t.type === 'WITHDRAWAL' && Math.abs(Number(t.amount) - Number(w.amount)) < 0.001 && Math.abs(new Date(t.createdAt).getTime() - new Date(w.createdAt).getTime()) < 180000)
+          (t.type === 'WITHDRAWAL' && (
+            (w.reference && t.description && t.description.includes(w.reference)) ||
+            (Math.abs(Number(t.amount) - Number(w.amount)) < 0.001 && Math.abs(new Date(t.createdAt).getTime() - new Date(w.createdAt).getTime()) < 86400000)
+          ))
         );
         if (!existsInTxs) {
           const withSt = String(w.status || '').toUpperCase();
